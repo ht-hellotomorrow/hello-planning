@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+
+  /* Hello Tomorrow brand */
+  --brand: #623ccd;
+  --brand-foreground: #ffffff;
+  --brand-soft: #ede8fb;
+  --accent: #56e0b0;
+  --accent-soft: #d9f7e9;
+
+  /* Category palettes — barre-progetto. Tinte scelte deterministicamente
+     dall'id progetto dentro la famiglia. Personali = grigio unico. */
+  --cat-client-1: #f4a8a8;
+  --cat-client-2: #ee8888;
+  --cat-client-3: #e36b6b;
+  --cat-client-4: #c54d4d;
+  --cat-internal-1: #b8a5f1;
+  --cat-internal-2: #9c83e7;
+  --cat-internal-3: #7e62db;
+  --cat-internal-4: #5e40bd;
+  --cat-personal: #a1a1aa;
+  --cat-archived: #d4d4d8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --font-sans: var(--font-work-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum";
+}
