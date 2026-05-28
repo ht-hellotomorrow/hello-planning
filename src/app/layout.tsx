@@ -18,7 +18,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="it" className={`${workSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="h-full flex flex-col bg-background text-foreground overflow-hidden">
         {children}
       </body>
     </html>

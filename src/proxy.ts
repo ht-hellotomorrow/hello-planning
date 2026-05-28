@@ -4,9 +4,12 @@ import { AUTH_COOKIE, isAuthed } from "@/lib/auth";
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isLoginRoute =
-    pathname === "/login" || pathname === "/api/auth/login";
-  if (isLoginRoute) return NextResponse.next();
+  const skipAuth =
+    pathname === "/login" ||
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/sync";
+  if (skipAuth) return NextResponse.next();
 
   const token = req.cookies.get(AUTH_COOKIE)?.value;
   if (await isAuthed(token)) return NextResponse.next();
