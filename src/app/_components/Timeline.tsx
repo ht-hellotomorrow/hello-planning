@@ -36,6 +36,7 @@ import {
   type CreateSegmentConfirmInput,
   type CreateSegmentDraft,
 } from "./CreateSegmentModal";
+import { ProjectDrawer, DRAWER_DRAG_TYPE } from "./ProjectDrawer";
 
 const WEEK_WIDTH = 80;
 const SIDEBAR_WIDTH = 240;
@@ -166,6 +167,7 @@ export function Timeline({
   const [drag, setDrag] = useState<DragState>(null);
   const [pendingCreate, setPendingCreate] =
     useState<CreateSegmentDraft | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const dragRef = useRef<DragState>(null);
   dragRef.current = drag;
 
@@ -497,6 +499,32 @@ export function Timeline({
     [applyOptimistic, weekISOs],
   );
 
+  // ── DROP DA CASSETTO ──────────────────────────────────────────────────
+  const onProjectDrop = useCallback(
+    (personId: string, projectId: string, clientX: number) => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      const scRect = scroller.getBoundingClientRect();
+      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const idx = Math.max(
+        0,
+        Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
+      );
+      const startISO = weekISOs[idx];
+      const endIdx = Math.min(WEEKS_TOTAL - 1, idx + 3); // default 4 settimane
+      const endISO = weekISOs[endIdx];
+      const person = people.find((p) => p.id === personId);
+      setPendingCreate({
+        personId,
+        personName: person?.firstName ?? "",
+        startWeek: startISO,
+        endWeek: endISO,
+        defaultProjectId: projectId,
+      });
+    },
+    [people, weekISOs],
+  );
+
   // ── DERIVED: lanes per person ────────────────────────────────────────
   const personLanes = useMemo(() => {
     const map = new Map<
@@ -557,6 +585,18 @@ export function Timeline({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen((v) => !v)}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition ${
+              drawerOpen
+                ? "bg-brand-soft text-brand"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+            aria-pressed={drawerOpen}
+          >
+            Da pianificare
+          </button>
           <Link
             href="/persone"
             className="px-3 py-1.5 rounded text-sm font-medium hover:bg-muted text-muted-foreground"
@@ -602,12 +642,12 @@ export function Timeline({
               return (
                 <div
                   key={p.id}
-                  className="group flex items-center gap-2 pl-4 pr-2 border-b border-border hover:bg-muted/40 transition"
+                  className="group flex items-start gap-2 pl-4 pr-2 pt-3 border-b border-border hover:bg-muted/40 transition"
                   style={{ height: rowHeight }}
                 >
                   <Link
                     href={`/persone#${p.id}`}
-                    className="flex items-center gap-3 flex-1 min-w-0"
+                    className="flex items-start gap-3 flex-1 min-w-0"
                   >
                     <div className="w-9 h-9 shrink-0 rounded-full bg-muted overflow-hidden flex items-center justify-center text-xs font-semibold text-muted-foreground">
                       {p.propicUrl ? (
@@ -735,11 +775,20 @@ export function Timeline({
                   onUpdateDays={onUpdateDays}
                   onDelete={onDeleteSeg}
                   onSplit={onSplitSeg}
+                  onProjectDrop={onProjectDrop}
                 />
               );
             })}
           </div>
         </div>
+
+        {/* Drawer "Da pianificare" */}
+        <ProjectDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          projects={projects}
+          segments={optimisticSegments}
+        />
       </div>
 
       {/* Create modal */}
@@ -778,6 +827,7 @@ type RowProps = {
   onUpdateDays: (segId: string, newDays: number) => void;
   onDelete: (segId: string) => void;
   onSplit: (segment: AllocationSegment, clientX: number) => void;
+  onProjectDrop: (personId: string, projectId: string, clientX: number) => void;
 };
 
 function PersonTimelineRow({
@@ -795,13 +845,32 @@ function PersonTimelineRow({
   onUpdateDays,
   onDelete,
   onSplit,
+  onProjectDrop,
 }: RowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
+  const [dropHover, setDropHover] = useState(false);
 
   function onRowMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
     if (!rowRef.current) return;
     onStartCreate(personId, e.clientX, rowRef.current);
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(DRAWER_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    if (!dropHover) setDropHover(true);
+  }
+  function onDragLeave() {
+    if (dropHover) setDropHover(false);
+  }
+  function onDrop(e: React.DragEvent) {
+    const projectId = e.dataTransfer.getData(DRAWER_DRAG_TYPE);
+    if (!projectId) return;
+    e.preventDefault();
+    setDropHover(false);
+    onProjectDrop(personId, projectId, e.clientX);
   }
 
   // Preview during drag
@@ -818,7 +887,12 @@ function PersonTimelineRow({
     <div
       ref={rowRef}
       onMouseDown={onRowMouseDown}
-      className="relative border-b border-border hover:bg-muted/10 transition-colors cursor-crosshair select-none"
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`relative border-b border-border transition-colors cursor-crosshair select-none ${
+        dropHover ? "bg-brand-soft" : "hover:bg-muted/10"
+      }`}
       style={{ height: rowHeight }}
     >
       {/* Week background */}
@@ -1010,7 +1084,7 @@ function AllocationBar({
   function onContextMenu(e: React.MouseEvent) {
     e.preventDefault();
     if (isArchived) return;
-    if (window.confirm(`Eliminare l'allocazione su ${project.name}?`)) {
+    if (window.confirm(`Eliminare la pianificazione su ${project.name}?`)) {
       onDelete();
     }
   }

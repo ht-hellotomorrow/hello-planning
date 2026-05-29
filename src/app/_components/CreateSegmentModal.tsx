@@ -25,6 +25,7 @@ export type CreateSegmentDraft = {
   personName: string;
   startWeek: string;
   endWeek: string;
+  defaultProjectId?: string;
 };
 
 export type CreateSegmentConfirmInput = {
@@ -57,7 +58,9 @@ export function CreateSegmentModal({
   onConfirm,
 }: Props) {
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    draft.defaultProjectId ?? null,
+  );
   const [days, setDays] = useState("1");
   const [startWeek, setStartWeek] = useState(draft.startWeek);
   const [endWeek, setEndWeek] = useState(draft.endWeek);
