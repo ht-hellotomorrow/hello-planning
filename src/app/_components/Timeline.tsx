@@ -26,12 +26,14 @@ import { assignLanes } from "@/lib/lanes";
 import {
   createSegment,
   deleteSegment,
+  splitSegment,
   updateSegment,
 } from "@/app/actions/allocations";
 import { SyncButton } from "./SyncButton";
 import { LogoutButton } from "./LogoutButton";
 import {
   CreateSegmentModal,
+  type CreateSegmentConfirmInput,
   type CreateSegmentDraft,
 } from "./CreateSegmentModal";
 
@@ -225,10 +227,10 @@ export function Timeline({
         const end = Math.max(d.anchorIdx, d.currentIdx);
         setPendingCreate({
           personId: d.personId,
-          personName: people.find((p) => p.id === d.personId)?.firstName ?? "",
+          personName:
+            people.find((p) => p.id === d.personId)?.firstName ?? "",
           startWeek: weekISOs[start],
           endWeek: weekISOs[end],
-          durationWeeks: end - start + 1,
         });
       } else if (d.kind === "move") {
         const offset = d.currentMouseIdx - d.mouseAnchorIdx;
@@ -374,31 +376,44 @@ export function Timeline({
   );
 
   // ── MODAL CONFIRM ─────────────────────────────────────────────────────
-  async function onConfirmCreate(projectId: string, daysPerWeek: number) {
+  async function onConfirmCreate(input: CreateSegmentConfirmInput) {
     if (!pendingCreate) return;
+    const personId = pendingCreate.personId;
     const tempId = `temp-${crypto.randomUUID()}`;
     const tempSegment: AllocationSegment = {
       id: tempId,
-      personId: pendingCreate.personId,
-      projectId,
-      startWeek: pendingCreate.startWeek,
-      endWeek: pendingCreate.endWeek,
-      daysPerWeek,
+      personId,
+      projectId: input.projectId,
+      startWeek: input.startWeek,
+      endWeek: input.endWeek,
+      daysPerWeek: input.daysPerWeek,
     };
     setPendingCreate(null);
     startTransition(async () => {
       applyOptimistic({ type: "create", segment: tempSegment });
       try {
         await createSegment({
-          personId: tempSegment.personId,
-          projectId: tempSegment.projectId,
-          startWeek: tempSegment.startWeek,
-          endWeek: tempSegment.endWeek,
-          daysPerWeek: tempSegment.daysPerWeek,
+          personId,
+          projectId: input.projectId,
+          startWeek: input.startWeek,
+          endWeek: input.endWeek,
+          daysPerWeek: input.daysPerWeek,
         });
       } catch (err) {
         console.error("create failed", err);
       }
+    });
+  }
+
+  function openCreateForPerson(personId: string, personName: string) {
+    // Default: dal lunedì corrente, 4 settimane di durata
+    const startDate = todayMonday;
+    const endDate = addWeeks(startDate, 3);
+    setPendingCreate({
+      personId,
+      personName,
+      startWeek: isoDate(startDate),
+      endWeek: isoDate(endDate),
     });
   }
 
@@ -433,6 +448,53 @@ export function Timeline({
       });
     },
     [applyOptimistic],
+  );
+
+  // ── SPLIT ─────────────────────────────────────────────────────────────
+  const onSplitSeg = useCallback(
+    (segment: AllocationSegment, clientX: number) => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      const scRect = scroller.getBoundingClientRect();
+      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const splitIdx = Math.max(
+        0,
+        Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
+      );
+      const splitISO = weekISOs[splitIdx];
+
+      // Validazione: deve cadere DOPO l'inizio e ENTRO la fine.
+      if (splitISO <= segment.startWeek || splitISO > segment.endWeek) return;
+      if (splitIdx === 0) return; // safety
+
+      const newEndForOriginal = weekISOs[splitIdx - 1];
+      const tempId = `temp-${crypto.randomUUID()}`;
+
+      startTransition(async () => {
+        applyOptimistic({
+          type: "update",
+          id: segment.id,
+          patch: { endWeek: newEndForOriginal },
+        });
+        applyOptimistic({
+          type: "create",
+          segment: {
+            id: tempId,
+            personId: segment.personId,
+            projectId: segment.projectId,
+            startWeek: splitISO,
+            endWeek: segment.endWeek,
+            daysPerWeek: segment.daysPerWeek,
+          },
+        });
+        try {
+          await splitSegment({ id: segment.id, splitAtWeek: splitISO });
+        } catch (err) {
+          console.error("split failed", err);
+        }
+      });
+    },
+    [applyOptimistic, weekISOs],
   );
 
   // ── DERIVED: lanes per person ────────────────────────────────────────
@@ -530,38 +592,67 @@ export function Timeline({
           ) : (
             people.map((p) => {
               const lanes = personLanes.get(p.id);
+              // Aggiungiamo una "lane" vuota in fondo (sempre cliccabile)
+              // così si può sempre creare una nuova pianificazione anche se
+              // tutte le corsie esistenti sono piene.
               const rowHeight = Math.max(
                 ROW_BASE,
-                (lanes?.count ?? 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP * 2,
+                ((lanes?.count ?? 0) + 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP,
               );
               return (
-                <Link
+                <div
                   key={p.id}
-                  href={`/persone#${p.id}`}
-                  className="flex items-center gap-3 px-4 border-b border-border hover:bg-muted/40 transition"
+                  className="group flex items-center gap-2 pl-4 pr-2 border-b border-border hover:bg-muted/40 transition"
                   style={{ height: rowHeight }}
                 >
-                  <div className="w-9 h-9 shrink-0 rounded-full bg-muted overflow-hidden flex items-center justify-center text-xs font-semibold text-muted-foreground">
-                    {p.propicUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.propicUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase()
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">
-                      {p.firstName} {p.lastName}
+                  <Link
+                    href={`/persone#${p.id}`}
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="w-9 h-9 shrink-0 rounded-full bg-muted overflow-hidden flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                      {p.propicUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.propicUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase()
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground tabular-nums">
-                      {p.capacityDaysPerWeek} gg/sett
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">
+                        {p.firstName} {p.lastName}
+                      </div>
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        {p.capacityDaysPerWeek} gg/sett
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => openCreateForPerson(p.id, p.firstName)}
+                    title="Nuova pianificazione"
+                    aria-label="Nuova pianificazione"
+                    className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-brand hover:text-brand-foreground transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
               );
             })
           )}
@@ -620,9 +711,12 @@ export function Timeline({
             {/* Rows */}
             {people.map((p) => {
               const lanes = personLanes.get(p.id);
+              // Aggiungiamo una "lane" vuota in fondo (sempre cliccabile)
+              // così si può sempre creare una nuova pianificazione anche se
+              // tutte le corsie esistenti sono piene.
               const rowHeight = Math.max(
                 ROW_BASE,
-                (lanes?.count ?? 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP * 2,
+                ((lanes?.count ?? 0) + 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP,
               );
               return (
                 <PersonTimelineRow
@@ -640,6 +734,7 @@ export function Timeline({
                   onStartResize={startResizeDrag}
                   onUpdateDays={onUpdateDays}
                   onDelete={onDeleteSeg}
+                  onSplit={onSplitSeg}
                 />
               );
             })}
@@ -682,6 +777,7 @@ type RowProps = {
   ) => void;
   onUpdateDays: (segId: string, newDays: number) => void;
   onDelete: (segId: string) => void;
+  onSplit: (segment: AllocationSegment, clientX: number) => void;
 };
 
 function PersonTimelineRow({
@@ -698,6 +794,7 @@ function PersonTimelineRow({
   onStartResize,
   onUpdateDays,
   onDelete,
+  onSplit,
 }: RowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -805,6 +902,7 @@ function PersonTimelineRow({
             }
             onUpdateDays={(newDays) => onUpdateDays(s.id, newDays)}
             onDelete={() => onDelete(s.id)}
+            onSplit={(clientX) => onSplit(s, clientX)}
           />
         );
       })}
@@ -839,6 +937,7 @@ type BarProps = {
   onStartResize: (edge: "left" | "right", clientX: number) => void;
   onUpdateDays: (newDays: number) => void;
   onDelete: () => void;
+  onSplit: (clientX: number) => void;
 };
 
 function AllocationBar({
@@ -851,6 +950,7 @@ function AllocationBar({
   onStartResize,
   onUpdateDays,
   onDelete,
+  onSplit,
 }: BarProps) {
   const segStart = parseISO(segment.startWeek);
   const segEnd = parseISO(segment.endWeek);
@@ -889,8 +989,12 @@ function AllocationBar({
   function onBarMouseDown(e: React.MouseEvent) {
     if (isArchived) return; // not movable
     if (e.button !== 0) return;
-    onStartMove(e.clientX);
     e.stopPropagation();
+    if (e.shiftKey) {
+      onSplit(e.clientX);
+      return;
+    }
+    onStartMove(e.clientX);
   }
 
   function onResizeEdgeMouseDown(
@@ -932,7 +1036,7 @@ function AllocationBar({
         backgroundColor: color,
         opacity: isArchived ? 0.6 : dragging ? 0.9 : 1,
       }}
-      title={`${project.name} · ${segment.daysPerWeek} gg/sett (click destro per eliminare)`}
+      title={`${project.name} · ${segment.daysPerWeek} gg/sett\nShift+click per spezzare · Click destro per eliminare`}
     >
       {/* Resize handle left */}
       {!isArchived && (
