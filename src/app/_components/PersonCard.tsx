@@ -45,7 +45,7 @@ export function PersonCard({ person }: { person: Person }) {
       try {
         await updatePerson(fd);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Errore");
+        setError(err instanceof Error ? err.message : "Error");
       }
     });
   }
@@ -65,14 +65,14 @@ export function PersonCard({ person }: { person: Person }) {
         if (person.archived) await unarchivePerson(person.id);
         else await archivePerson(person.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Errore");
+        setError(err instanceof Error ? err.message : "Error");
       }
     });
   }
 
   function onDelete() {
     const ok = window.confirm(
-      `Eliminare definitivamente ${person.firstName} ${person.lastName}? Tutte le sue allocazioni verranno rimosse. L'operazione non è reversibile.`,
+      `Permanently delete ${person.firstName} ${person.lastName}? All their schedules will be removed. This action cannot be undone.`,
     );
     if (!ok) return;
     setError(null);
@@ -80,7 +80,7 @@ export function PersonCard({ person }: { person: Person }) {
       try {
         await deletePerson(person.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Errore");
+        setError(err instanceof Error ? err.message : "Error");
       }
     });
   }
@@ -104,20 +104,20 @@ export function PersonCard({ person }: { person: Person }) {
         <input
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          placeholder="Nome"
+          placeholder="First name"
           className="px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
         />
         <input
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
-          placeholder="Cognome"
+          placeholder="Last name"
           className="px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
         />
         <input
           value={propicUrl}
           onChange={(e) => setPropicUrl(e.target.value)}
           type="url"
-          placeholder="URL foto profilo"
+          placeholder="Profile photo URL"
           className="col-span-2 px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
         />
         <label className="col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -131,7 +131,7 @@ export function PersonCard({ person }: { person: Person }) {
             max="7"
             className="w-20 px-2 py-1 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none tabular-nums"
           />
-          gg/sett
+          d/wk
         </label>
         {error && (
           <p className="col-span-2 text-xs text-red-600">{error}</p>
@@ -143,9 +143,9 @@ export function PersonCard({ person }: { person: Person }) {
           type="button"
           onClick={onSave}
           disabled={!dirty || pending}
-          className="px-3 py-1.5 rounded bg-brand text-brand-foreground text-xs font-medium hover:opacity-90 disabled:opacity-30"
+          className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-30"
         >
-          Salva
+          Save
         </button>
         {dirty && (
           <button
@@ -154,7 +154,7 @@ export function PersonCard({ person }: { person: Person }) {
             disabled={pending}
             className="px-3 py-1.5 rounded text-xs text-muted-foreground hover:bg-muted"
           >
-            Annulla
+            Cancel
           </button>
         )}
         <button
@@ -163,7 +163,7 @@ export function PersonCard({ person }: { person: Person }) {
           disabled={pending}
           className="px-3 py-1.5 rounded text-xs text-muted-foreground hover:bg-muted"
         >
-          {person.archived ? "Riattiva" : "Archivia"}
+          {person.archived ? "Restore" : "Archive"}
         </button>
         <button
           type="button"
@@ -171,7 +171,7 @@ export function PersonCard({ person }: { person: Person }) {
           disabled={pending}
           className="px-3 py-1.5 rounded text-xs text-red-600 hover:bg-red-50"
         >
-          Elimina
+          Delete
         </button>
       </div>
     </div>

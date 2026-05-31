@@ -25,7 +25,7 @@ function LoginForm() {
       router.refresh();
     } else {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      setError(data.error || "Errore");
+      setError(data.error || "Error");
       setLoading(false);
     }
   }
@@ -38,7 +38,7 @@ function LoginForm() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight">Hello Planning</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Accedi con la password aziendale
+          Sign in with the company password
         </p>
       </div>
       <label className="block text-sm">
@@ -55,9 +55,9 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading || !password}
-        className="w-full py-2.5 rounded-md bg-brand text-brand-foreground font-medium hover:opacity-90 disabled:opacity-50 transition"
+        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 transition"
       >
-        {loading ? "..." : "Entra"}
+        {loading ? "..." : "Sign in"}
       </button>
     </form>
   );

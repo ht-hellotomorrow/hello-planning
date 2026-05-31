@@ -4,13 +4,19 @@
   --background: #ffffff;
   --foreground: #0a0a0a;
   --muted: #f4f4f5;
+  --muted-hover: #ececef;
   --muted-foreground: #71717a;
   --border: #e4e4e7;
+  --grid-line: #d4d4d8;
 
   /* Hello Tomorrow brand */
   --brand: #623ccd;
   --brand-foreground: #ffffff;
   --brand-soft: #ede8fb;
+
+  /* Primary actions (CTA buttons) */
+  --primary: #000000;
+  --primary-foreground: #ffffff;
   --accent: #56e0b0;
   --accent-soft: #d9f7e9;
 
@@ -32,12 +38,16 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-hover: var(--muted-hover);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-grid-line: var(--grid-line);
 
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
 

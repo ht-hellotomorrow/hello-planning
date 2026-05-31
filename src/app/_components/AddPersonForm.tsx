@@ -17,7 +17,7 @@ export function AddPersonForm() {
         formRef.current?.reset();
         setOpen(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Errore");
+        setError(err instanceof Error ? err.message : "Error");
       }
     });
   }
@@ -29,7 +29,7 @@ export function AddPersonForm() {
         onClick={() => setOpen(true)}
         className="w-full text-left px-3 py-2 rounded-md border border-dashed border-border hover:border-brand hover:text-brand text-sm text-muted-foreground transition"
       >
-        + Aggiungi persona
+        + Add person
       </button>
     );
   }
@@ -43,21 +43,21 @@ export function AddPersonForm() {
       <div className="grid grid-cols-2 gap-2">
         <input
           name="firstName"
-          placeholder="Nome"
+          placeholder="First name"
           required
           autoFocus
           className="px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
         />
         <input
           name="lastName"
-          placeholder="Cognome"
+          placeholder="Last name"
           className="px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
         />
       </div>
       <input
         name="propicUrl"
         type="url"
-        placeholder="URL foto profilo (opz.)"
+        placeholder="Profile photo URL (optional)"
         className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
       />
       <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function AddPersonForm() {
             defaultValue="5"
             className="w-16 px-2 py-1 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none tabular-nums"
           />
-          gg/sett
+          d/wk
         </label>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -80,9 +80,9 @@ export function AddPersonForm() {
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 py-1.5 rounded bg-brand text-brand-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+          className="flex-1 py-1.5 rounded bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "..." : "Aggiungi"}
+          {pending ? "..." : "Add"}
         </button>
         <button
           type="button"
@@ -92,7 +92,7 @@ export function AddPersonForm() {
           }}
           className="px-3 py-1.5 rounded text-sm text-muted-foreground hover:bg-muted"
         >
-          Annulla
+          Cancel
         </button>
       </div>
     </form>

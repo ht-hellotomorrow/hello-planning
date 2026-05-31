@@ -29,16 +29,16 @@ export function SyncButton() {
       if (res.ok) {
         setMsg({
           kind: "ok",
-          text: `${data.total} progetti sincronizzati (${data.added} nuovi, ${data.updated} aggiornati)`,
+          text: `${data.total} projects synced (${data.added} new, ${data.updated} updated)`,
         });
         router.refresh();
       } else {
-        setMsg({ kind: "err", text: data.error ?? "Sync fallito" });
+        setMsg({ kind: "err", text: data.error ?? "Sync failed" });
       }
     } catch (err) {
       setMsg({
         kind: "err",
-        text: err instanceof Error ? err.message : "Errore di rete",
+        text: err instanceof Error ? err.message : "Network error",
       });
     } finally {
       setLoading(false);
@@ -51,9 +51,9 @@ export function SyncButton() {
         type="button"
         onClick={onClick}
         disabled={loading}
-        className="px-4 py-2 rounded-md bg-brand text-brand-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 transition"
+        className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 transition"
       >
-        {loading ? "Sincronizzo…" : "Sincronizza ora"}
+        {loading ? "Syncing…" : "Sync Airtable"}
       </button>
       {msg && (
         <p

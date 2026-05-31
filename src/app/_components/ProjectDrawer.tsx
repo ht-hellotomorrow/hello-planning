@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { createPersonalProject } from "@/app/actions/projects";
 
@@ -17,7 +18,7 @@ type Project = {
 const CATEGORY_LABEL: Record<Category, string> = {
   ht_internal: "HT Internal",
   ht_client: "HT Client",
-  personal: "Personale",
+  personal: "Personal",
 };
 
 const CATEGORY_BADGE: Record<Category, string> = {
@@ -75,33 +76,20 @@ export function ProjectDrawer({
       <header className="px-4 py-3 border-b border-border flex items-center justify-between gap-2 shrink-0">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold tracking-tight">
-            Da pianificare
+            Backlog
           </h2>
           <p className="text-xs text-muted-foreground">
-            Trascina su una persona
+            Drag onto a person
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded hover:bg-muted text-muted-foreground"
-          aria-label="Chiudi cassetto"
-          title="Chiudi"
+          className="p-1.5 rounded bg-muted hover:bg-muted-hover text-muted-foreground"
+          aria-label="Close backlog"
+          title="Close"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <X size={16} aria-hidden />
         </button>
       </header>
 
@@ -109,7 +97,7 @@ export function ProjectDrawer({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cerca progetto…"
+          placeholder="Search project…"
           className="w-full px-3 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
         {showForm ? (
@@ -123,7 +111,7 @@ export function ProjectDrawer({
             onClick={() => setShowForm(true)}
             className="w-full text-left px-3 py-2 rounded border border-dashed border-border hover:border-brand hover:text-brand text-sm text-muted-foreground transition"
           >
-            + Nuovo progetto personale
+            + New personal project
           </button>
         )}
       </div>
@@ -131,7 +119,7 @@ export function ProjectDrawer({
       <ul className="flex-1 overflow-y-auto p-2 space-y-1">
         {visible.length === 0 ? (
           <li className="text-sm text-muted-foreground text-center py-6">
-            Nessun progetto.
+            No projects.
           </li>
         ) : (
           visible.map((p) => {
@@ -161,9 +149,9 @@ export function ProjectDrawer({
                     {used && (
                       <span
                         className="text-[10px] text-muted-foreground shrink-0"
-                        title="Già pianificato altrove"
+                        title="Already scheduled elsewhere"
                       >
-                        · usato
+                        · used
                       </span>
                     )}
                   </div>
@@ -196,7 +184,7 @@ function PersonalProjectForm({
     setError(null);
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Nome richiesto");
+      setError("Name required");
       return;
     }
     startTransition(async () => {
@@ -206,7 +194,7 @@ function PersonalProjectForm({
         setCode("");
         onDone();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Errore");
+        setError(err instanceof Error ? err.message : "Error");
       }
     });
   }
@@ -216,14 +204,14 @@ function PersonalProjectForm({
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Nome progetto"
+        placeholder="Project name"
         autoFocus
         className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none"
       />
       <input
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        placeholder="Codice (opzionale)"
+        placeholder="Code (optional)"
         className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none font-mono"
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -232,9 +220,9 @@ function PersonalProjectForm({
           type="button"
           onClick={submit}
           disabled={pending || !name.trim()}
-          className="flex-1 py-1.5 rounded bg-brand text-brand-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+          className="flex-1 py-1.5 rounded bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "..." : "Crea"}
+          {pending ? "..." : "Create"}
         </button>
         <button
           type="button"
@@ -242,7 +230,7 @@ function PersonalProjectForm({
           disabled={pending}
           className="px-3 py-1.5 rounded text-sm text-muted-foreground hover:bg-muted"
         >
-          Annulla
+          Cancel
         </button>
       </div>
     </div>

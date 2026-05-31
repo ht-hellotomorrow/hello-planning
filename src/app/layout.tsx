@@ -10,14 +10,14 @@ const workSans = Work_Sans({
 
 export const metadata: Metadata = {
   title: "Hello Planning",
-  description: "Pianificazione risorse — Hello Tomorrow",
+  description: "Resource planning — Hello Tomorrow",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it" className={`${workSans.variable} h-full antialiased`}>
+    <html lang="en" className={`${workSans.variable} h-full antialiased`}>
       <body className="h-full flex flex-col bg-background text-foreground overflow-hidden">
         {children}
       </body>

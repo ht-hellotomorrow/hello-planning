@@ -1,6 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { allocationSegments, people, projects } from "@/db/schema";
+import {
+  allocationSegments,
+  people,
+  personProjectOrder,
+  projects,
+} from "@/db/schema";
 import { todayMondayISO } from "@/lib/weeks";
 import { Timeline } from "./_components/Timeline";
 
@@ -10,14 +15,17 @@ export default async function Home() {
   let peopleRows: Awaited<ReturnType<typeof loadPeople>> = [];
   let projectRows: Awaited<ReturnType<typeof loadProjects>> = [];
   let segmentRows: Awaited<ReturnType<typeof loadSegments>> = [];
+  let projectOrderRows: Awaited<ReturnType<typeof loadProjectOrder>> = [];
   let dbError: string | null = null;
 
   try {
-    [peopleRows, projectRows, segmentRows] = await Promise.all([
-      loadPeople(),
-      loadProjects(),
-      loadSegments(),
-    ]);
+    [peopleRows, projectRows, segmentRows, projectOrderRows] =
+      await Promise.all([
+        loadPeople(),
+        loadProjects(),
+        loadSegments(),
+        loadProjectOrder(),
+      ]);
   } catch (err) {
     dbError = err instanceof Error ? err.message : "DB error";
   }
@@ -26,13 +34,13 @@ export default async function Home() {
     return (
       <main className="flex-1 flex items-center justify-center p-8">
         <div className="max-w-md p-6 rounded-md border border-red-200 bg-red-50 text-red-800 text-sm">
-          <strong>DB non inizializzato.</strong>
+          <strong>Database not initialized.</strong>
           <p className="mt-2">
-            Esegui{" "}
+            Run{" "}
             <code className="px-1.5 py-0.5 bg-red-100 rounded font-mono text-xs">
               npm run db:push
             </code>{" "}
-            per creare le tabelle.
+            to create the tables.
           </p>
           <p className="mt-2 text-xs opacity-70">{dbError}</p>
         </div>
@@ -45,6 +53,7 @@ export default async function Home() {
       people={peopleRows}
       projects={projectRows}
       segments={segmentRows}
+      projectOrder={projectOrderRows}
       todayISO={todayMondayISO()}
     />
   );
@@ -87,4 +96,18 @@ async function loadSegments() {
       daysPerWeek: allocationSegments.daysPerWeek,
     })
     .from(allocationSegments);
+}
+
+async function loadProjectOrder() {
+  return db
+    .select({
+      personId: personProjectOrder.personId,
+      projectId: personProjectOrder.projectId,
+      sortOrder: personProjectOrder.sortOrder,
+    })
+    .from(personProjectOrder)
+    .orderBy(
+      asc(personProjectOrder.personId),
+      asc(personProjectOrder.sortOrder),
+    );
 }

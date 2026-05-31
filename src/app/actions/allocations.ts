@@ -15,20 +15,20 @@ export type CreateSegmentInput = {
 
 function validateDays(d: number) {
   if (!Number.isFinite(d) || d <= 0 || d > 7) {
-    throw new Error("Giorni/sett invalido (0 < x ≤ 7)");
+    throw new Error("Days per week must be between 0 and 7");
   }
 }
 
 function validateRange(start: string, end: string) {
-  if (!start || !end) throw new Error("Settimane richieste");
-  if (end < start) throw new Error("La settimana di fine viene prima di quella di inizio");
+  if (!start || !end) throw new Error("Weeks required");
+  if (end < start) throw new Error("End week is before start week");
 }
 
 export async function createSegment(
   input: CreateSegmentInput,
 ): Promise<{ id: string }> {
-  if (!input.personId) throw new Error("Persona richiesta");
-  if (!input.projectId) throw new Error("Progetto richiesto");
+  if (!input.personId) throw new Error("Person required");
+  if (!input.projectId) throw new Error("Project required");
   validateRange(input.startWeek, input.endWeek);
   validateDays(input.daysPerWeek);
 
@@ -53,7 +53,7 @@ export type UpdateSegmentInput = {
 };
 
 export async function updateSegment(id: string, patch: UpdateSegmentInput) {
-  if (!id) throw new Error("Id richiesto");
+  if (!id) throw new Error("Id required");
 
   const update: Record<string, unknown> = {
     updatedAt: sql`current_timestamp`,
@@ -79,7 +79,7 @@ export async function updateSegment(id: string, patch: UpdateSegmentInput) {
 }
 
 export async function deleteSegment(id: string) {
-  if (!id) throw new Error("Id richiesto");
+  if (!id) throw new Error("Id required");
   await db.delete(allocationSegments).where(eq(allocationSegments.id, id));
   revalidatePath("/");
 }
@@ -89,26 +89,26 @@ export type SplitSegmentInput = {
   splitAtWeek: string;
 };
 
-// Spezza un segmento in due adiacenti al lunedì `splitAtWeek`:
-//   originale: [startWeek, splitAtWeek - 1 settimana]
-//   nuovo:     [splitAtWeek, endWeek]
-// Entrambi mantengono persona, progetto e gg/sett.
+// Split a segment in two adjacent ones at Monday `splitAtWeek`:
+//   original: [startWeek, splitAtWeek - 1 week]
+//   new:      [splitAtWeek, endWeek]
+// Both keep the same person, project, and days/week.
 export async function splitSegment(
   input: SplitSegmentInput,
 ): Promise<{ newId: string }> {
-  if (!input.id) throw new Error("Id richiesto");
-  if (!input.splitAtWeek) throw new Error("Settimana di split richiesta");
+  if (!input.id) throw new Error("Id required");
+  if (!input.splitAtWeek) throw new Error("Split week required");
 
   const original = await db.query.allocationSegments.findFirst({
     where: eq(allocationSegments.id, input.id),
   });
-  if (!original) throw new Error("Segmento non trovato");
+  if (!original) throw new Error("Segment not found");
 
   if (input.splitAtWeek <= original.startWeek) {
-    throw new Error("Lo split deve cadere dopo l'inizio del segmento");
+    throw new Error("Split must fall after the segment start");
   }
   if (input.splitAtWeek > original.endWeek) {
-    throw new Error("Lo split deve cadere entro la fine del segmento");
+    throw new Error("Split must fall within the segment end");
   }
 
   const newOriginalEnd = previousMondayISO(input.splitAtWeek);
@@ -132,7 +132,7 @@ export async function splitSegment(
   return { newId };
 }
 
-// Sottrae 7 giorni a una data yyyy-mm-dd in UTC.
+// Subtracts 7 days from a yyyy-mm-dd date in UTC.
 function previousMondayISO(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 7);

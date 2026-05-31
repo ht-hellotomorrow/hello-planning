@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { asc, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { people } from "@/db/schema";
@@ -8,7 +9,7 @@ import { PersonCard } from "../_components/PersonCard";
 
 export const dynamic = "force-dynamic";
 
-export default async function PersonePage() {
+export default async function PeoplePage() {
   const rows = await db
     .select({
       id: people.id,
@@ -33,19 +34,20 @@ export default async function PersonePage() {
           </div>
           <div>
             <h1 className="text-base font-bold tracking-tight leading-tight">
-              Persone
+              People
             </h1>
             <p className="text-xs text-muted-foreground leading-tight">
-              Gestisci il team e la capacity
+              Manage the team and capacity
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="px-3 py-1.5 rounded text-sm font-medium hover:bg-muted text-muted-foreground"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium hover:bg-muted text-muted-foreground"
           >
-            ← Torna alla timeline
+            <ArrowLeft size={16} aria-hidden />
+            Back to timeline
           </Link>
           <LogoutButton />
         </div>
@@ -54,18 +56,18 @@ export default async function PersonePage() {
       <main className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full">
         <section className="mb-8">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-            Aggiungi persona
+            Add person
           </h2>
           <AddPersonForm />
         </section>
 
         <section className="mb-8">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-            Attive ({active.length})
+            Active ({active.length})
           </h2>
           {active.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-md">
-              Nessuna persona attiva.
+              No active people yet.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -81,7 +83,7 @@ export default async function PersonePage() {
         {archived.length > 0 && (
           <section className="mb-8">
             <h2 className="text-sm uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-              Archiviate ({archived.length})
+              Archived ({archived.length})
             </h2>
             <ul className="space-y-2 opacity-60">
               {archived.map((p) => (

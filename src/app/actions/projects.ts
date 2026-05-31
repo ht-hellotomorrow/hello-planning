@@ -13,7 +13,7 @@ export async function createPersonalProject(
   input: CreatePersonalProjectInput,
 ): Promise<{ id: string }> {
   const name = input.name?.trim();
-  if (!name) throw new Error("Nome richiesto");
+  if (!name) throw new Error("Name required");
   const code = input.code?.trim() || null;
 
   const id = crypto.randomUUID();

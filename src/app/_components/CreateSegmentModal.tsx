@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isoDate, parseISO, toMonday, weeksBetween } from "@/lib/weeks";
 
@@ -17,16 +18,26 @@ type Project = {
 const CATEGORY_LABEL: Record<Category, string> = {
   ht_internal: "HT Internal",
   ht_client: "HT Client",
-  personal: "Personale",
+  personal: "Personal",
 };
 
-export type CreateSegmentDraft = {
+export type SegmentDraft = {
+  // common
   personId: string;
   personName: string;
   startWeek: string;
   endWeek: string;
+  // for create
   defaultProjectId?: string;
+  // for edit
+  mode?: "create" | "edit";
+  segmentId?: string;
+  lockedProject?: { id: string; name: string; code: string | null };
+  initialDays?: number;
 };
+
+// Backwards-compat alias
+export type CreateSegmentDraft = SegmentDraft;
 
 export type CreateSegmentConfirmInput = {
   projectId: string;
@@ -36,7 +47,7 @@ export type CreateSegmentConfirmInput = {
 };
 
 type Props = {
-  draft: CreateSegmentDraft;
+  draft: SegmentDraft;
   projects: Project[];
   onCancel: () => void;
   onConfirm: (input: CreateSegmentConfirmInput) => Promise<void>;
@@ -57,20 +68,25 @@ export function CreateSegmentModal({
   onCancel,
   onConfirm,
 }: Props) {
+  const isEdit = draft.mode === "edit";
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(
-    draft.defaultProjectId ?? null,
+    draft.lockedProject?.id ?? draft.defaultProjectId ?? null,
   );
-  const [days, setDays] = useState("1");
+  const [days, setDays] = useState(
+    draft.initialDays !== undefined ? String(draft.initialDays) : "1",
+  );
   const [startWeek, setStartWeek] = useState(draft.startWeek);
   const [endWeek, setEndWeek] = useState(draft.endWeek);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const daysRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    searchRef.current?.focus();
-  }, []);
+    if (isEdit) daysRef.current?.select();
+    else searchRef.current?.focus();
+  }, [isEdit]);
 
   const durationWeeks = useMemo(() => {
     if (!startWeek || !endWeek) return 0;
@@ -93,7 +109,6 @@ export function CreateSegmentModal({
   function onStartInput(value: string) {
     const monday = snapToMondayISO(value);
     setStartWeek(monday);
-    // Auto-aggiusta fine se ora viene prima dell'inizio
     if (monday && endWeek && monday > endWeek) setEndWeek(monday);
   }
   function onEndInput(value: string) {
@@ -104,16 +119,16 @@ export function CreateSegmentModal({
   async function submit() {
     setError(null);
     if (!selectedId) {
-      setError("Scegli un progetto");
+      setError("Pick a project");
       return;
     }
     if (!datesValid) {
-      setError("Date non valide");
+      setError("Invalid dates");
       return;
     }
     const d = Number.parseFloat(days);
     if (!Number.isFinite(d) || d <= 0 || d > 7) {
-      setError("Giorni/sett tra 0 e 7");
+      setError("Days per week must be between 0 and 7");
       return;
     }
     setSubmitting(true);
@@ -125,7 +140,7 @@ export function CreateSegmentModal({
         endWeek,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Errore");
+      setError(err instanceof Error ? err.message : "Error");
       setSubmitting(false);
     }
   }
@@ -139,23 +154,25 @@ export function CreateSegmentModal({
     >
       <div className="bg-background rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
         <header className="px-5 py-4 border-b border-border">
-          <h2 className="text-base font-semibold">Nuova pianificazione</h2>
+          <h2 className="text-base font-semibold">
+            {isEdit ? "Edit schedule" : "New schedule"}
+          </h2>
           <p className="text-xs text-muted-foreground mt-1">
             {draft.personName}
             {durationWeeks > 0 && (
               <>
                 {" · "}
-                {durationWeeks} {durationWeeks === 1 ? "settimana" : "settimane"}
+                {durationWeeks} {durationWeeks === 1 ? "week" : "weeks"}
               </>
             )}
           </p>
         </header>
 
         <div className="p-5 flex-1 overflow-y-auto space-y-5">
-          {/* Periodo */}
+          {/* Period */}
           <div>
             <label className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">
-              Periodo (lunedì → lunedì)
+              Period (Monday → Monday)
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -164,7 +181,7 @@ export function CreateSegmentModal({
                 onChange={(e) => onStartInput(e.target.value)}
                 className="flex-1 px-3 py-2 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 tabular-nums"
               />
-              <span className="text-muted-foreground">→</span>
+              <ArrowRight size={16} className="text-muted-foreground shrink-0" aria-hidden />
               <input
                 type="date"
                 value={endWeek}
@@ -174,57 +191,74 @@ export function CreateSegmentModal({
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Le date vengono agganciate al lunedì della settimana scelta.
+              Dates snap to the Monday of the chosen week.
             </p>
           </div>
 
-          {/* Progetto */}
-          <div>
-            <label className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">
-              Progetto
-            </label>
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cerca per nome o codice…"
-              className="w-full px-3 py-2 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 mb-2"
-            />
-            <ul className="max-h-56 overflow-y-auto border border-border rounded">
-              {filtered.length === 0 ? (
-                <li className="px-3 py-3 text-sm text-muted-foreground text-center">
-                  Nessun progetto trovato
-                </li>
-              ) : (
-                filtered.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(p.id)}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b border-border last:border-b-0 ${
-                        selectedId === p.id ? "bg-brand-soft" : ""
-                      }`}
-                    >
-                      <div className="font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground flex gap-2">
-                        <span className="font-mono">{p.code ?? "—"}</span>
-                        <span>·</span>
-                        <span>{CATEGORY_LABEL[p.category]}</span>
-                      </div>
-                    </button>
+          {/* Project — locked in edit, picker in create */}
+          {isEdit && draft.lockedProject ? (
+            <div>
+              <label className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">
+                Project
+              </label>
+              <div className="px-3 py-2 border border-border rounded bg-muted/30">
+                <div className="font-medium truncate text-sm">
+                  {draft.lockedProject.name}
+                </div>
+                <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                  {draft.lockedProject.code ?? "—"}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">
+                Project
+              </label>
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name or code…"
+                className="w-full px-3 py-2 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 mb-2"
+              />
+              <ul className="max-h-56 overflow-y-auto border border-border rounded">
+                {filtered.length === 0 ? (
+                  <li className="px-3 py-3 text-sm text-muted-foreground text-center">
+                    No projects found
                   </li>
-                ))
-              )}
-            </ul>
-          </div>
+                ) : (
+                  filtered.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(p.id)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b border-border last:border-b-0 ${
+                          selectedId === p.id ? "bg-brand-soft" : ""
+                        }`}
+                      >
+                        <div className="font-medium truncate">{p.name}</div>
+                        <div className="text-xs text-muted-foreground flex gap-2">
+                          <span className="font-mono">{p.code ?? "—"}</span>
+                          <span>·</span>
+                          <span>{CATEGORY_LABEL[p.category]}</span>
+                        </div>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          )}
 
-          {/* Giorni */}
+          {/* Days */}
           <div>
             <label className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">
-              Giorni a settimana
+              Days per week
             </label>
             <div className="flex items-center gap-2">
               <input
+                ref={daysRef}
                 value={days}
                 onChange={(e) => setDays(e.target.value)}
                 type="number"
@@ -233,7 +267,7 @@ export function CreateSegmentModal({
                 max="7"
                 className="w-24 px-3 py-2 text-sm rounded border border-border bg-background focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 tabular-nums"
               />
-              <span className="text-sm text-muted-foreground">gg/sett</span>
+              <span className="text-sm text-muted-foreground">d/wk</span>
               <div className="flex gap-1 ml-auto">
                 {["0.5", "1", "2", "3", "5"].map((v) => (
                   <button
@@ -259,15 +293,15 @@ export function CreateSegmentModal({
             disabled={submitting}
             className="px-4 py-2 rounded text-sm text-muted-foreground hover:bg-muted"
           >
-            Annulla
+            Cancel
           </button>
           <button
             type="button"
             onClick={submit}
             disabled={submitting || !selectedId || !datesValid}
-            className="px-4 py-2 rounded bg-brand text-brand-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
           >
-            {submitting ? "..." : "Crea"}
+            {submitting ? "..." : isEdit ? "Save" : "Create"}
           </button>
         </footer>
       </div>

@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
 export const people = sqliteTable("people", {
   id: text("id")
@@ -42,6 +49,20 @@ export const projects = sqliteTable(
       .default(sql`(current_timestamp)`),
   },
   (table) => [index("projects_visibility_idx").on(table.visibility)],
+);
+
+export const personProjectOrder = sqliteTable(
+  "person_project_order",
+  {
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.personId, table.projectId] })],
 );
 
 export const allocationSegments = sqliteTable(

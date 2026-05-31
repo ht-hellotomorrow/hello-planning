@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  GripVertical,
+  Plus,
+  User,
+} from "lucide-react";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -21,16 +31,22 @@ import {
   weekRange,
   weeksBetween,
 } from "@/lib/weeks";
-import { projectColor } from "@/lib/colors";
+import { projectColor, isPersonal } from "@/lib/colors";
 import { assignLanes } from "@/lib/lanes";
+import {
+  sortProjectIds,
+  totalPlannedDays,
+  weeklyTotalsForSegments,
+} from "@/lib/timeline-rows";
 import {
   createSegment,
   deleteSegment,
   splitSegment,
   updateSegment,
 } from "@/app/actions/allocations";
+import { savePersonProjectOrder } from "@/app/actions/person-project-order";
+import { HeaderMenu } from "./HeaderMenu";
 import { SyncButton } from "./SyncButton";
-import { LogoutButton } from "./LogoutButton";
 import {
   CreateSegmentModal,
   type CreateSegmentConfirmInput,
@@ -39,14 +55,16 @@ import {
 import { ProjectDrawer, DRAWER_DRAG_TYPE } from "./ProjectDrawer";
 
 const WEEK_WIDTH = 80;
-const SIDEBAR_WIDTH = 240;
-const ROW_BASE = 64;
+const SIDEBAR_WIDTH = 280;
+const HEADER_HEIGHT = 64;
+const PERSON_ROW_HEIGHT = 44;
+const PROJECT_ROW_BASE = 36;
 const LANE_HEIGHT = 28;
 const LANE_GAP = 4;
-const HEADER_HEIGHT = 64;
 const WEEKS_TOTAL = 60;
 const WEEKS_BEFORE_TODAY = 12;
 const RESIZE_HANDLE = 8;
+const PROJECT_ROW_DRAG = "application/x-hello-planning-project-row";
 
 type Category = "ht_internal" | "ht_client" | "personal";
 type Visibility = "active" | "archived" | "hidden";
@@ -76,10 +94,17 @@ type AllocationSegment = {
   daysPerWeek: number;
 };
 
+type ProjectOrderEntry = {
+  personId: string;
+  projectId: string;
+  sortOrder: number;
+};
+
 export type TimelineProps = {
   people: Person[];
   projects: Project[];
   segments: AllocationSegment[];
+  projectOrder: ProjectOrderEntry[];
   todayISO: string;
 };
 
@@ -88,9 +113,9 @@ type DragState =
   | {
       kind: "create";
       personId: string;
+      projectId?: string;
       anchorIdx: number;
       currentIdx: number;
-      rowTop: number;
     }
   | {
       kind: "move";
@@ -132,10 +157,21 @@ function optimisticReducer(
   }
 }
 
+function formatTotal(n: number): string {
+  if (n === 0) return "";
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function projectRowHeight(laneCount: number): number {
+  if (laneCount <= 1) return PROJECT_ROW_BASE;
+  return LANE_GAP + laneCount * (LANE_HEIGHT + LANE_GAP) + LANE_GAP;
+}
+
 export function Timeline({
   people,
   projects,
   segments,
+  projectOrder,
   todayISO,
 }: TimelineProps) {
   const today = useMemo(() => parseISO(todayISO), [todayISO]);
@@ -154,16 +190,50 @@ export function Timeline({
     () => Object.fromEntries(projects.map((p) => [p.id, p])),
     [projects],
   );
+  const projectNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        projects.map((p) => [p.id, p.code ?? p.name]),
+      ),
+    [projects],
+  );
   const todayWeekIndex = WEEKS_BEFORE_TODAY;
 
-  // Optimistic state
+  const serverOrderByPerson = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const grouped = new Map<string, ProjectOrderEntry[]>();
+    for (const row of projectOrder) {
+      const list = grouped.get(row.personId) ?? [];
+      list.push(row);
+      grouped.set(row.personId, list);
+    }
+    for (const [personId, rows] of grouped) {
+      map.set(
+        personId,
+        [...rows]
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((r) => r.projectId),
+      );
+    }
+    return map;
+  }, [projectOrder]);
+
+  const [orderOverrides, setOrderOverrides] = useState<
+    Record<string, string[]>
+  >({});
+  const [collapsedPeople, setCollapsedPeople] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(
+    null,
+  );
+
   const [optimisticSegments, applyOptimistic] = useOptimistic(
     segments,
     optimisticReducer,
   );
   const [, startTransition] = useTransition();
 
-  // Drag + modal state
   const [drag, setDrag] = useState<DragState>(null);
   const [pendingCreate, setPendingCreate] =
     useState<CreateSegmentDraft | null>(null);
@@ -171,7 +241,6 @@ export function Timeline({
   const dragRef = useRef<DragState>(null);
   dragRef.current = drag;
 
-  // Initial scroll
   const initialScrollLeft = useMemo(() => {
     const target = firstMondayOfMonthOffset(today, -1);
     const idx = weeksBetween(rangeStart, target);
@@ -195,7 +264,60 @@ export function Timeline({
     });
   }
 
-  // ── DRAG MOUSE HANDLERS ──────────────────────────────────────────────
+  const allPeopleExpanded =
+    people.length > 0 && collapsedPeople.size === 0;
+
+  function toggleAllPeople() {
+    if (allPeopleExpanded) {
+      setCollapsedPeople(new Set(people.map((p) => p.id)));
+    } else {
+      setCollapsedPeople(new Set());
+    }
+  }
+
+  function getProjectOrder(personId: string, projectIds: string[]): string[] {
+    const override = orderOverrides[personId];
+    const server = serverOrderByPerson.get(personId);
+    return sortProjectIds(
+      projectIds,
+      override ?? server,
+      projectNameById,
+    );
+  }
+
+  const reorderProjects = useCallback(
+    (personId: string, fromId: string, toId: string) => {
+      if (fromId === toId) return;
+      const segs = optimisticSegments.filter((s) => s.personId === personId);
+      const ids = [...new Set(segs.map((s) => s.projectId))];
+      const current = sortProjectIds(
+        ids,
+        orderOverrides[personId] ?? serverOrderByPerson.get(personId),
+        projectNameById,
+      );
+      const fromIdx = current.indexOf(fromId);
+      const toIdx = current.indexOf(toId);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const next = [...current];
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, fromId);
+      setOrderOverrides((prev) => ({ ...prev, [personId]: next }));
+      startTransition(async () => {
+        try {
+          await savePersonProjectOrder(personId, next);
+        } catch (err) {
+          console.error("reorder failed", err);
+        }
+      });
+    },
+    [
+      optimisticSegments,
+      orderOverrides,
+      serverOrderByPerson,
+      projectNameById,
+    ],
+  );
+
   useEffect(() => {
     if (!drag) return;
 
@@ -227,12 +349,13 @@ export function Timeline({
       if (d.kind === "create") {
         const start = Math.min(d.anchorIdx, d.currentIdx);
         const end = Math.max(d.anchorIdx, d.currentIdx);
+        const person = people.find((p) => p.id === d.personId);
         setPendingCreate({
           personId: d.personId,
-          personName:
-            people.find((p) => p.id === d.personId)?.firstName ?? "",
+          personName: person?.firstName ?? "",
           startWeek: weekISOs[start],
           endWeek: weekISOs[end],
+          defaultProjectId: d.projectId,
         });
       } else if (d.kind === "move") {
         const offset = d.currentMouseIdx - d.mouseAnchorIdx;
@@ -301,9 +424,8 @@ export function Timeline({
     };
   }, [drag, applyOptimistic, weekISOs, people]);
 
-  // ── BAR/ROW INTERACTION CALLBACKS ─────────────────────────────────────
   const startCreateDrag = useCallback(
-    (personId: string, clientX: number, rowEl: HTMLElement) => {
+    (personId: string, projectId: string | undefined, clientX: number) => {
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
@@ -315,9 +437,9 @@ export function Timeline({
       setDrag({
         kind: "create",
         personId,
+        projectId,
         anchorIdx: idx,
         currentIdx: idx,
-        rowTop: rowEl.getBoundingClientRect().top,
       });
     },
     [],
@@ -377,25 +499,52 @@ export function Timeline({
     [rangeStart],
   );
 
-  // ── MODAL CONFIRM ─────────────────────────────────────────────────────
   async function onConfirmCreate(input: CreateSegmentConfirmInput) {
     if (!pendingCreate) return;
-    const personId = pendingCreate.personId;
+    const draft = pendingCreate;
+    setPendingCreate(null);
+
+    // Edit branch: update existing segment in place.
+    if (draft.mode === "edit" && draft.segmentId) {
+      const segId = draft.segmentId;
+      startTransition(async () => {
+        applyOptimistic({
+          type: "update",
+          id: segId,
+          patch: {
+            startWeek: input.startWeek,
+            endWeek: input.endWeek,
+            daysPerWeek: input.daysPerWeek,
+          },
+        });
+        try {
+          await updateSegment(segId, {
+            startWeek: input.startWeek,
+            endWeek: input.endWeek,
+            daysPerWeek: input.daysPerWeek,
+          });
+        } catch (err) {
+          console.error("edit failed", err);
+        }
+      });
+      return;
+    }
+
+    // Create branch.
     const tempId = `temp-${crypto.randomUUID()}`;
     const tempSegment: AllocationSegment = {
       id: tempId,
-      personId,
+      personId: draft.personId,
       projectId: input.projectId,
       startWeek: input.startWeek,
       endWeek: input.endWeek,
       daysPerWeek: input.daysPerWeek,
     };
-    setPendingCreate(null);
     startTransition(async () => {
       applyOptimistic({ type: "create", segment: tempSegment });
       try {
         await createSegment({
-          personId,
+          personId: draft.personId,
           projectId: input.projectId,
           startWeek: input.startWeek,
           endWeek: input.endWeek,
@@ -407,8 +556,35 @@ export function Timeline({
     });
   }
 
-  function openCreateForPerson(personId: string, personName: string) {
-    // Default: dal lunedì corrente, 4 settimane di durata
+  // Open the modal in edit mode (locked project, prefilled values).
+  const onEditSeg = useCallback(
+    (segment: AllocationSegment) => {
+      const person = people.find((p) => p.id === segment.personId);
+      const project = projectById[segment.projectId];
+      if (!person || !project) return;
+      setPendingCreate({
+        mode: "edit",
+        segmentId: segment.id,
+        personId: segment.personId,
+        personName: person.firstName,
+        startWeek: segment.startWeek,
+        endWeek: segment.endWeek,
+        initialDays: segment.daysPerWeek,
+        lockedProject: {
+          id: project.id,
+          name: project.name,
+          code: project.code,
+        },
+      });
+    },
+    [people, projectById],
+  );
+
+  function openCreateForPerson(
+    personId: string,
+    personName: string,
+    defaultProjectId?: string,
+  ) {
     const startDate = todayMonday;
     const endDate = addWeeks(startDate, 3);
     setPendingCreate({
@@ -416,10 +592,10 @@ export function Timeline({
       personName,
       startWeek: isoDate(startDate),
       endWeek: isoDate(endDate),
+      defaultProjectId,
     });
   }
 
-  // ── INLINE DAYS EDIT ──────────────────────────────────────────────────
   const onUpdateDays = useCallback(
     (segId: string, newDays: number) => {
       startTransition(async () => {
@@ -452,7 +628,6 @@ export function Timeline({
     [applyOptimistic],
   );
 
-  // ── SPLIT ─────────────────────────────────────────────────────────────
   const onSplitSeg = useCallback(
     (segment: AllocationSegment, clientX: number) => {
       const scroller = scrollRef.current;
@@ -464,10 +639,8 @@ export function Timeline({
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
       );
       const splitISO = weekISOs[splitIdx];
-
-      // Validazione: deve cadere DOPO l'inizio e ENTRO la fine.
       if (splitISO <= segment.startWeek || splitISO > segment.endWeek) return;
-      if (splitIdx === 0) return; // safety
+      if (splitIdx === 0) return;
 
       const newEndForOriginal = weekISOs[splitIdx - 1];
       const tempId = `temp-${crypto.randomUUID()}`;
@@ -499,9 +672,12 @@ export function Timeline({
     [applyOptimistic, weekISOs],
   );
 
-  // ── DROP DA CASSETTO ──────────────────────────────────────────────────
   const onProjectDrop = useCallback(
-    (personId: string, projectId: string, clientX: number) => {
+    (
+      personId: string,
+      projectId: string,
+      clientX: number,
+    ) => {
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
@@ -511,7 +687,7 @@ export function Timeline({
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
       );
       const startISO = weekISOs[idx];
-      const endIdx = Math.min(WEEKS_TOTAL - 1, idx + 3); // default 4 settimane
+      const endIdx = Math.min(WEEKS_TOTAL - 1, idx + 3);
       const endISO = weekISOs[endIdx];
       const person = people.find((p) => p.id === personId);
       setPendingCreate({
@@ -525,29 +701,24 @@ export function Timeline({
     [people, weekISOs],
   );
 
-  // ── DERIVED: lanes per person ────────────────────────────────────────
-  const personLanes = useMemo(() => {
-    const map = new Map<
-      string,
-      { laned: Array<AllocationSegment & { lane: number }>; count: number }
-    >();
-    for (const p of people) {
-      const segs = optimisticSegments.filter((s) => s.personId === p.id);
-      map.set(p.id, assignLanes(segs));
-    }
-    return map;
-  }, [optimisticSegments, people]);
-
   const totalGridWidth = WEEKS_TOTAL * WEEK_WIDTH;
+  const totalContentWidth = SIDEBAR_WIDTH + totalGridWidth;
+
+  const weekGridStyle = {
+    gridTemplateColumns: `repeat(${WEEKS_TOTAL}, ${WEEK_WIDTH}px)`,
+  } as const;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Top header */}
       <header className="px-6 py-3 border-b border-border flex items-center justify-between gap-4 bg-background z-30 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-brand text-accent text-base font-extrabold">
-            H!
-          </div>
+          <img
+            src="/ht-logo.png"
+            alt="Hello Tomorrow"
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-md object-cover"
+          />
           <div>
             <h1 className="text-base font-bold tracking-tight leading-tight">
               Hello Planning
@@ -562,227 +733,297 @@ export function Timeline({
           <button
             type="button"
             onClick={() => shiftWeeks(-4)}
-            className="p-2 rounded hover:bg-muted text-muted-foreground"
-            aria-label="Indietro 4 settimane"
+            className="p-2 rounded bg-muted hover:bg-muted-hover text-muted-foreground"
+            aria-label="Back 4 weeks"
           >
-            ←
+            <ChevronLeft size={18} aria-hidden />
           </button>
           <button
             type="button"
             onClick={scrollToToday}
-            className="px-3 py-1.5 rounded hover:bg-muted text-sm font-medium"
+            className="px-3 py-1.5 rounded hover:bg-muted text-sm font-semibold"
           >
-            Oggi
+            Today
           </button>
           <button
             type="button"
             onClick={() => shiftWeeks(4)}
-            className="p-2 rounded hover:bg-muted text-muted-foreground"
-            aria-label="Avanti 4 settimane"
+            className="p-2 rounded bg-muted hover:bg-muted-hover text-muted-foreground"
+            aria-label="Forward 4 weeks"
           >
-            →
+            <ChevronRight size={18} aria-hidden />
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen((v) => !v)}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition ${
-              drawerOpen
-                ? "bg-brand-soft text-brand"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-            aria-pressed={drawerOpen}
-          >
-            Da pianificare
-          </button>
-          <Link
-            href="/persone"
-            className="px-3 py-1.5 rounded text-sm font-medium hover:bg-muted text-muted-foreground"
-          >
-            Persone
-          </Link>
+        <div className="flex items-center gap-2">
           <SyncButton />
-          <LogoutButton />
+          <HeaderMenu
+            drawerOpen={drawerOpen}
+            onToggleDrawer={() => setDrawerOpen((v) => !v)}
+          />
         </div>
       </header>
 
-      {/* Body */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Sidebar persone */}
-        <aside
-          className="shrink-0 border-r border-border bg-background overflow-y-auto"
-          style={{ width: SIDEBAR_WIDTH }}
-        >
-          <div
-            className="px-4 flex items-end pb-2 border-b border-border text-xs text-muted-foreground font-semibold uppercase tracking-wider sticky top-0 bg-background z-10"
-            style={{ height: HEADER_HEIGHT }}
-          >
-            Persone
-          </div>
-          {people.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">
-              Nessuna persona.{" "}
-              <Link href="/persone" className="text-brand hover:underline">
-                Aggiungine una
-              </Link>
-              .
-            </div>
-          ) : (
-            people.map((p) => {
-              const lanes = personLanes.get(p.id);
-              // Aggiungiamo una "lane" vuota in fondo (sempre cliccabile)
-              // così si può sempre creare una nuova pianificazione anche se
-              // tutte le corsie esistenti sono piene.
-              const rowHeight = Math.max(
-                ROW_BASE,
-                ((lanes?.count ?? 0) + 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP,
-              );
-              return (
-                <div
-                  key={p.id}
-                  className="group flex items-start gap-2 pl-4 pr-2 pt-3 border-b border-border hover:bg-muted/40 transition"
-                  style={{ height: rowHeight }}
-                >
-                  <Link
-                    href={`/persone#${p.id}`}
-                    className="flex items-start gap-3 flex-1 min-w-0"
-                  >
-                    <div className="w-9 h-9 shrink-0 rounded-full bg-muted overflow-hidden flex items-center justify-center text-xs font-semibold text-muted-foreground">
-                      {p.propicUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.propicUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">
-                        {p.firstName} {p.lastName}
-                      </div>
-                      <div className="text-xs text-muted-foreground tabular-nums">
-                        {p.capacityDaysPerWeek} gg/sett
-                      </div>
-                    </div>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => openCreateForPerson(p.id, p.firstName)}
-                    title="Nuova pianificazione"
-                    aria-label="Nuova pianificazione"
-                    className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-brand hover:text-brand-foreground transition opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </aside>
-
-        {/* Timeline scrollabile */}
-        <div ref={scrollRef} className="flex-1 overflow-auto">
-          <div style={{ width: totalGridWidth }}>
+        <div ref={scrollRef} className="flex-1 overflow-auto bg-muted">
+          <div style={{ minWidth: totalContentWidth }}>
             {/* Sticky header */}
             <div
-              className="sticky top-0 z-20 bg-background border-b border-border"
+              className="sticky top-0 z-20 flex bg-background border-b border-grid-line"
               style={{ height: HEADER_HEIGHT }}
             >
               <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: `repeat(${WEEKS_TOTAL}, ${WEEK_WIDTH}px)`,
-                  height: 32,
-                }}
+                className="shrink-0 pl-2 pr-3 flex items-end gap-1 pb-2 border-r border-border sticky left-0 z-30 bg-background"
+                style={{ width: SIDEBAR_WIDTH }}
               >
-                {months.map((m, i) => (
-                  <div
-                    key={`${m.label}-${i}`}
-                    className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r border-border last:border-r-0 truncate"
-                    style={{ gridColumn: `span ${m.count}` }}
-                  >
-                    {m.label}
-                  </div>
-                ))}
+                <button
+                  type="button"
+                  onClick={toggleAllPeople}
+                  disabled={people.length === 0}
+                  title={
+                    allPeopleExpanded
+                      ? "Collapse all people"
+                      : "Expand all people"
+                  }
+                  aria-label={
+                    allPeopleExpanded
+                      ? "Collapse all people"
+                      : "Expand all people"
+                  }
+                  className="mb-0.5 p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  {allPeopleExpanded ? (
+                    <ChevronsDownUp size={16} aria-hidden />
+                  ) : (
+                    <ChevronsUpDown size={16} aria-hidden />
+                  )}
+                </button>
+                <span className="flex-1 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                  People
+                </span>
               </div>
-              <div
-                className="grid border-t border-border"
-                style={{
-                  gridTemplateColumns: `repeat(${WEEKS_TOTAL}, ${WEEK_WIDTH}px)`,
-                  height: 32,
-                }}
-              >
-                {weeks.map((w, i) => {
-                  const isToday = i === todayWeekIndex;
-                  return (
+              <div style={{ width: totalGridWidth }}>
+                <div className="grid" style={{ ...weekGridStyle, height: 32 }}>
+                  {months.map((m, i) => (
                     <div
-                      key={isoDate(w)}
-                      className={`px-2 py-2 text-xs tabular-nums border-r border-border last:border-r-0 ${
-                        isToday
-                          ? "text-brand font-semibold"
-                          : "text-muted-foreground"
-                      }`}
+                      key={`${m.label}-${i}`}
+                      className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r border-grid-line last:border-r-0 truncate"
+                      style={{ gridColumn: `span ${m.count}` }}
                     >
-                      {dayMonth(w)}
+                      {m.label}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+                <div
+                  className="grid border-t border-grid-line"
+                  style={{ ...weekGridStyle, height: 32 }}
+                >
+                  {weeks.map((w, i) => {
+                    const isToday = i === todayWeekIndex;
+                    return (
+                      <div
+                        key={isoDate(w)}
+                        className={`px-2 py-2 text-xs tabular-nums border-r border-grid-line last:border-r-0 ${
+                          isToday
+                            ? "text-brand font-semibold"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {dayMonth(w)}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Rows */}
-            {people.map((p) => {
-              const lanes = personLanes.get(p.id);
-              // Aggiungiamo una "lane" vuota in fondo (sempre cliccabile)
-              // così si può sempre creare una nuova pianificazione anche se
-              // tutte le corsie esistenti sono piene.
-              const rowHeight = Math.max(
-                ROW_BASE,
-                ((lanes?.count ?? 0) + 1) * (LANE_HEIGHT + LANE_GAP) + LANE_GAP,
-              );
-              return (
-                <PersonTimelineRow
-                  key={p.id}
-                  personId={p.id}
-                  rowHeight={rowHeight}
-                  segments={lanes?.laned ?? []}
-                  projectById={projectById}
-                  weekISOs={weekISOs}
-                  todayWeekIndex={todayWeekIndex}
-                  rangeStart={rangeStart}
-                  drag={drag}
-                  onStartCreate={startCreateDrag}
-                  onStartMove={startMoveDrag}
-                  onStartResize={startResizeDrag}
-                  onUpdateDays={onUpdateDays}
-                  onDelete={onDeleteSeg}
-                  onSplit={onSplitSeg}
-                  onProjectDrop={onProjectDrop}
-                />
-              );
-            })}
+            {/* Body rows */}
+            {people.length === 0 ? (
+              <div
+                className="flex bg-background"
+                style={{ width: totalContentWidth }}
+              >
+                <div
+                  className="p-4 text-sm text-muted-foreground border-r border-border sticky left-0 bg-background"
+                  style={{ width: SIDEBAR_WIDTH }}
+                >
+                  No people yet.{" "}
+                  <Link href="/people" className="text-brand hover:underline">
+                    Add one
+                  </Link>
+                  .
+                </div>
+              </div>
+            ) : (
+              people.map((p, personIndex) => {
+                const personSegs = optimisticSegments.filter(
+                  (s) => s.personId === p.id,
+                );
+                const projectIds = getProjectOrder(
+                  p.id,
+                  personSegs.map((s) => s.projectId),
+                );
+                const expanded = !collapsedPeople.has(p.id);
+                const weeklyTotals = weeklyTotalsForSegments(
+                  personSegs,
+                  weekISOs,
+                );
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`bg-background border-b-[3px] border-border shadow-[inset_0_-1px_0_0_var(--grid-line)] ${
+                      personIndex > 0 ? "border-t-2 border-t-border mt-2" : ""
+                    }`}
+                  >
+                    {/* Person summary row */}
+                    <div
+                      className="flex border-b border-grid-line bg-muted/50"
+                      style={{ height: PERSON_ROW_HEIGHT }}
+                    >
+                      <PersonSidebarHeader
+                        person={p}
+                        expanded={expanded}
+                        onToggle={() =>
+                          setCollapsedPeople((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(p.id)) next.delete(p.id);
+                            else next.add(p.id);
+                            return next;
+                          })
+                        }
+                        onNewSchedule={() =>
+                          openCreateForPerson(p.id, p.firstName)
+                        }
+                      />
+                      <PersonWeeklyTotalsRow
+                        weeklyTotals={weeklyTotals}
+                        capacity={p.capacityDaysPerWeek}
+                        weekISOs={weekISOs}
+                        todayWeekIndex={todayWeekIndex}
+                      />
+                    </div>
+
+                    {expanded &&
+                      projectIds.map((projectId) => {
+                        const project = projectById[projectId];
+                        if (!project) return null;
+                        const projSegs = personSegs.filter(
+                          (s) => s.projectId === projectId,
+                        );
+                        const { laned, count: laneCount } =
+                          assignLanes(projSegs);
+                        const rowHeight = projectRowHeight(laneCount);
+                        const totalDays = totalPlannedDays(
+                          projSegs,
+                          rangeStart,
+                          WEEKS_TOTAL,
+                        );
+
+                        return (
+                          <div
+                            key={`${p.id}-${projectId}`}
+                            className="flex border-b border-grid-line"
+                            style={{ height: rowHeight }}
+                          >
+                            <ProjectSidebarRow
+                              project={project}
+                              totalDays={totalDays}
+                              personId={p.id}
+                              projectId={projectId}
+                              isDragOver={dragOverProjectId === projectId}
+                              onDragOver={(e) => {
+                                if (
+                                  !e.dataTransfer.types.includes(
+                                    PROJECT_ROW_DRAG,
+                                  )
+                                )
+                                  return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                                setDragOverProjectId(projectId);
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverProjectId === projectId) {
+                                  setDragOverProjectId(null);
+                                }
+                              }}
+                              onDrop={(fromProjectId) => {
+                                setDragOverProjectId(null);
+                                reorderProjects(
+                                  p.id,
+                                  fromProjectId,
+                                  projectId,
+                                );
+                              }}
+                              onAssign={() =>
+                                openCreateForPerson(
+                                  p.id,
+                                  p.firstName,
+                                  projectId,
+                                )
+                              }
+                            />
+                            <ProjectTimelineRow
+                              personId={p.id}
+                              projectId={projectId}
+                              rowHeight={rowHeight}
+                              segments={laned}
+                              project={project}
+                              weekISOs={weekISOs}
+                              todayWeekIndex={todayWeekIndex}
+                              rangeStart={rangeStart}
+                              drag={drag}
+                              onStartCreate={(clientX) =>
+                                startCreateDrag(p.id, projectId, clientX)
+                              }
+                              onStartMove={startMoveDrag}
+                              onStartResize={startResizeDrag}
+                              onUpdateDays={onUpdateDays}
+                              onDelete={onDeleteSeg}
+                              onSplit={onSplitSeg}
+                              onEdit={onEditSeg}
+                              onProjectDrop={(clientX) =>
+                                onProjectDrop(p.id, projectId, clientX)
+                              }
+                            />
+                          </div>
+                        );
+                      })}
+
+                    {expanded && (
+                      <div
+                        className="flex bg-muted/20"
+                        style={{ height: 36 }}
+                      >
+                        <div
+                          className="shrink-0 pl-10 pr-3 flex items-center sticky left-0 z-10 bg-muted/20 border-r border-border"
+                          style={{ width: SIDEBAR_WIDTH }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCreateForPerson(p.id, p.firstName)
+                            }
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                          >
+                            <Plus size={12} aria-hidden />
+                            Assign project
+                          </button>
+                        </div>
+                        <div
+                          className="bg-muted"
+                          style={{ width: totalGridWidth }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
-        {/* Drawer "Da pianificare" */}
         <ProjectDrawer
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
@@ -791,7 +1032,6 @@ export function Timeline({
         />
       </div>
 
-      {/* Create modal */}
       {pendingCreate && (
         <CreateSegmentModal
           draft={pendingCreate}
@@ -804,20 +1044,207 @@ export function Timeline({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Row component
-// ─────────────────────────────────────────────────────────────────────────
+// ─── Sidebar: person header ───────────────────────────────────────────────
 
-type RowProps = {
+function PersonSidebarHeader({
+  person,
+  expanded,
+  onToggle,
+  onNewSchedule,
+}: {
+  person: Person;
+  expanded: boolean;
+  onToggle: () => void;
+  onNewSchedule: () => void;
+}) {
+  return (
+    <div
+      className="group shrink-0 flex items-center gap-1 pl-2 pr-2 border-r border-border sticky left-0 z-10 bg-muted/50"
+      style={{ width: SIDEBAR_WIDTH }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1 rounded hover:bg-muted text-muted-foreground"
+        aria-label={expanded ? "Collapse projects" : "Expand projects"}
+      >
+        {expanded ? (
+          <ChevronDown size={14} aria-hidden />
+        ) : (
+          <ChevronRight size={14} aria-hidden />
+        )}
+      </button>
+      <Link
+        href={`/people#${person.id}`}
+        className="flex items-center gap-2 flex-1 min-w-0 py-1"
+      >
+        <div className="w-8 h-8 shrink-0 rounded-full bg-muted overflow-hidden flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+          {person.propicUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={person.propicUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            `${person.firstName[0] ?? ""}${person.lastName[0] ?? ""}`.toUpperCase()
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate">
+            {person.firstName} {person.lastName}
+          </div>
+        </div>
+      </Link>
+      <button
+        type="button"
+        onClick={onNewSchedule}
+        title="New schedule"
+        aria-label="New schedule"
+        className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+      >
+        <Plus size={14} strokeWidth={2.5} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+// ─── Sidebar: project row (draggable) ─────────────────────────────────────
+
+function ProjectSidebarRow({
+  project,
+  totalDays,
+  personId,
+  projectId,
+  isDragOver,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onAssign,
+}: {
+  project: Project;
+  totalDays: number;
   personId: string;
+  projectId: string;
+  isDragOver: boolean;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (fromProjectId: string) => void;
+  onAssign: () => void;
+}) {
+  const color = projectColor(project);
+  const label = project.code ?? project.name;
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(
+          PROJECT_ROW_DRAG,
+          JSON.stringify({ personId, projectId }),
+        );
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => {
+        const raw = e.dataTransfer.getData(PROJECT_ROW_DRAG);
+        if (!raw) return;
+        e.preventDefault();
+        try {
+          const data = JSON.parse(raw) as {
+            personId: string;
+            projectId: string;
+          };
+          if (data.personId !== personId) return;
+          onDrop(data.projectId);
+        } catch {
+          /* ignore */
+        }
+      }}
+      className={`shrink-0 flex items-center gap-1 pl-1 pr-3 border-r border-border sticky left-0 z-10 bg-background cursor-grab active:cursor-grabbing ${
+        isDragOver ? "bg-brand-soft" : ""
+      }`}
+      style={{ width: SIDEBAR_WIDTH }}
+    >
+      <GripVertical
+        size={14}
+        className="shrink-0 text-muted-foreground/50"
+        aria-hidden
+      />
+      <span
+        className="w-2 h-2 rounded-full shrink-0"
+        style={{ backgroundColor: color }}
+      />
+      <button
+        type="button"
+        onClick={onAssign}
+        className="text-sm truncate flex-1 text-left hover:underline min-w-0"
+        title={label}
+      >
+        {isPersonal(project) && (
+          <User size={12} className="inline mr-1 -mt-0.5" aria-hidden />
+        )}
+        {label}
+      </button>
+      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+        {formatTotal(totalDays)}
+      </span>
+    </div>
+  );
+}
+
+// ─── Grid: person weekly totals ───────────────────────────────────────────
+
+function PersonWeeklyTotalsRow({
+  weeklyTotals,
+  capacity,
+  weekISOs,
+  todayWeekIndex,
+}: {
+  weeklyTotals: number[];
+  capacity: number;
+  weekISOs: string[];
+  todayWeekIndex: number;
+}) {
+  return (
+    <div
+      className="grid bg-muted/50"
+      style={{
+        gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)`,
+        height: PERSON_ROW_HEIGHT,
+      }}
+    >
+      {weeklyTotals.map((total, i) => {
+        const over = total > capacity;
+        return (
+          <div
+            key={weekISOs[i]}
+            className={`flex items-center justify-center text-xs tabular-nums border-r border-grid-line last:border-r-0 ${
+              i === todayWeekIndex ? "bg-brand/5" : ""
+            } ${over ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
+          >
+            {formatTotal(total)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Grid: project timeline row ───────────────────────────────────────────
+
+type ProjectRowProps = {
+  personId: string;
+  projectId: string;
   rowHeight: number;
   segments: Array<AllocationSegment & { lane: number }>;
-  projectById: Record<string, Project>;
+  project: Project;
   weekISOs: string[];
   todayWeekIndex: number;
   rangeStart: Date;
   drag: DragState;
-  onStartCreate: (personId: string, clientX: number, row: HTMLElement) => void;
+  onStartCreate: (clientX: number) => void;
   onStartMove: (segment: AllocationSegment, clientX: number) => void;
   onStartResize: (
     segment: AllocationSegment,
@@ -827,14 +1254,16 @@ type RowProps = {
   onUpdateDays: (segId: string, newDays: number) => void;
   onDelete: (segId: string) => void;
   onSplit: (segment: AllocationSegment, clientX: number) => void;
-  onProjectDrop: (personId: string, projectId: string, clientX: number) => void;
+  onEdit: (segment: AllocationSegment) => void;
+  onProjectDrop: (clientX: number) => void;
 };
 
-function PersonTimelineRow({
+function ProjectTimelineRow({
   personId,
+  projectId,
   rowHeight,
   segments,
-  projectById,
+  project,
   weekISOs,
   todayWeekIndex,
   rangeStart,
@@ -845,18 +1274,19 @@ function PersonTimelineRow({
   onUpdateDays,
   onDelete,
   onSplit,
+  onEdit,
   onProjectDrop,
-}: RowProps) {
+}: ProjectRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const [dropHover, setDropHover] = useState(false);
 
   function onRowMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
-    if (!rowRef.current) return;
-    onStartCreate(personId, e.clientX, rowRef.current);
+    onStartCreate(e.clientX);
   }
 
   function onDragOver(e: React.DragEvent) {
+    if (e.dataTransfer.types.includes(PROJECT_ROW_DRAG)) return;
     if (!e.dataTransfer.types.includes(DRAWER_DRAG_TYPE)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
@@ -866,16 +1296,18 @@ function PersonTimelineRow({
     if (dropHover) setDropHover(false);
   }
   function onDrop(e: React.DragEvent) {
-    const projectId = e.dataTransfer.getData(DRAWER_DRAG_TYPE);
-    if (!projectId) return;
+    if (e.dataTransfer.types.includes(PROJECT_ROW_DRAG)) return;
+    const pid = e.dataTransfer.getData(DRAWER_DRAG_TYPE);
+    if (!pid) return;
     e.preventDefault();
     setDropHover(false);
-    onProjectDrop(personId, projectId, e.clientX);
+    onProjectDrop(e.clientX);
   }
 
-  // Preview during drag
   const createPreview =
-    drag?.kind === "create" && drag.personId === personId
+    drag?.kind === "create" &&
+    drag.personId === personId &&
+    drag.projectId === projectId
       ? (() => {
           const start = Math.min(drag.anchorIdx, drag.currentIdx);
           const end = Math.max(drag.anchorIdx, drag.currentIdx);
@@ -890,12 +1322,11 @@ function PersonTimelineRow({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`relative border-b border-border transition-colors cursor-crosshair select-none ${
-        dropHover ? "bg-brand-soft" : "hover:bg-muted/10"
+      className={`relative transition-colors cursor-crosshair select-none ${
+        dropHover ? "bg-brand-soft" : "hover:bg-muted-hover"
       }`}
-      style={{ height: rowHeight }}
+      style={{ width: weekISOs.length * WEEK_WIDTH, height: rowHeight }}
     >
-      {/* Week background */}
       <div
         className="absolute inset-0 grid pointer-events-none"
         style={{
@@ -905,25 +1336,19 @@ function PersonTimelineRow({
         {weekISOs.map((iso, i) => (
           <div
             key={iso}
-            className={`border-r border-border/50 last:border-r-0 ${
+            className={`border-r border-grid-line last:border-r-0 ${
               i === todayWeekIndex ? "bg-brand/5" : ""
             }`}
           />
         ))}
       </div>
 
-      {/* Today line */}
       <div
         className="absolute top-0 bottom-0 w-px bg-brand/40 pointer-events-none"
         style={{ left: todayWeekIndex * WEEK_WIDTH }}
       />
 
-      {/* Allocation bars */}
       {segments.map((s) => {
-        const project = projectById[s.projectId];
-        if (!project) return null;
-
-        // Apply drag preview offset
         let startISO = s.startWeek;
         let endISO = s.endWeek;
         let dragging = false;
@@ -977,17 +1402,18 @@ function PersonTimelineRow({
             onUpdateDays={(newDays) => onUpdateDays(s.id, newDays)}
             onDelete={() => onDelete(s.id)}
             onSplit={(clientX) => onSplit(s, clientX)}
+            onEdit={() => onEdit(s)}
           />
         );
       })}
 
-      {/* Create preview */}
       {createPreview && (
         <div
           className="absolute top-1 bottom-1 rounded-md bg-brand/30 border-2 border-brand pointer-events-none flex items-center justify-center text-xs font-medium text-brand"
           style={{
             left: createPreview.start * WEEK_WIDTH + 4,
-            width: (createPreview.end - createPreview.start + 1) * WEEK_WIDTH - 8,
+            width:
+              (createPreview.end - createPreview.start + 1) * WEEK_WIDTH - 8,
           }}
         >
           {createPreview.end - createPreview.start + 1} sett.
@@ -997,9 +1423,7 @@ function PersonTimelineRow({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Allocation bar with drag handles + inline edit
-// ─────────────────────────────────────────────────────────────────────────
+// ─── Allocation bar ───────────────────────────────────────────────────────
 
 type BarProps = {
   segment: AllocationSegment;
@@ -1012,6 +1436,7 @@ type BarProps = {
   onUpdateDays: (newDays: number) => void;
   onDelete: () => void;
   onSplit: (clientX: number) => void;
+  onEdit: () => void;
 };
 
 function AllocationBar({
@@ -1025,6 +1450,7 @@ function AllocationBar({
   onUpdateDays,
   onDelete,
   onSplit,
+  onEdit,
 }: BarProps) {
   const segStart = parseISO(segment.startWeek);
   const segEnd = parseISO(segment.endWeek);
@@ -1041,7 +1467,7 @@ function AllocationBar({
   const top = LANE_GAP + laneIndex * (LANE_HEIGHT + LANE_GAP);
 
   const color = projectColor(project);
-  const isPersonal = project.category === "personal";
+  const personal = isPersonal(project);
   const isArchived = project.visibility === "archived";
 
   const [editing, setEditing] = useState(false);
@@ -1061,7 +1487,7 @@ function AllocationBar({
   }
 
   function onBarMouseDown(e: React.MouseEvent) {
-    if (isArchived) return; // not movable
+    if (isArchived) return;
     if (e.button !== 0) return;
     e.stopPropagation();
     if (e.shiftKey) {
@@ -1084,22 +1510,29 @@ function AllocationBar({
   function onContextMenu(e: React.MouseEvent) {
     e.preventDefault();
     if (isArchived) return;
-    if (window.confirm(`Eliminare la pianificazione su ${project.name}?`)) {
+    if (window.confirm(`Delete schedule on ${project.name}?`)) {
       onDelete();
     }
   }
+
+  const barLabel = `${project.code ?? project.name} · ${segment.daysPerWeek} d/w`;
 
   return (
     <div
       onMouseDown={onBarMouseDown}
       onContextMenu={onContextMenu}
+      onDoubleClick={(e) => {
+        if (isArchived) return;
+        e.stopPropagation();
+        onEdit();
+      }}
       className={`absolute rounded-md px-2 text-xs font-medium overflow-hidden flex items-center gap-1 group ${
         isArchived
           ? "text-zinc-700 cursor-default"
-          : isPersonal
+          : personal
             ? "text-zinc-800 cursor-grab active:cursor-grabbing"
             : "text-white cursor-grab active:cursor-grabbing"
-      } ${isPersonal ? "border-2 border-dashed border-zinc-500" : ""} ${
+      } ${personal ? "border-2 border-dashed border-zinc-500" : ""} ${
         dragging ? "ring-2 ring-brand opacity-90 z-10 shadow-lg" : ""
       }`}
       style={{
@@ -1110,9 +1543,8 @@ function AllocationBar({
         backgroundColor: color,
         opacity: isArchived ? 0.6 : dragging ? 0.9 : 1,
       }}
-      title={`${project.name} · ${segment.daysPerWeek} gg/sett\nShift+click per spezzare · Click destro per eliminare`}
+      title={`${barLabel}\nDouble-click to edit · Shift+click to split · Right-click to delete`}
     >
-      {/* Resize handle left */}
       {!isArchived && (
         <div
           onMouseDown={(e) => onResizeEdgeMouseDown(e, "left")}
@@ -1121,23 +1553,12 @@ function AllocationBar({
         />
       )}
 
-      {overflowsLeft && <span className="opacity-60">‹</span>}
-      {isPersonal && (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden
-        >
-          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-        </svg>
+      {overflowsLeft && (
+        <ChevronLeft size={12} className="opacity-60 shrink-0" aria-hidden />
       )}
-      <span className="truncate flex-1 pointer-events-none">
-        {project.code ?? project.name}
-      </span>
+      {personal && <User size={12} className="shrink-0" aria-hidden />}
+      <span className="truncate flex-1 pointer-events-none">{barLabel}</span>
 
-      {/* Days (clickable inline edit) */}
       {editing ? (
         <input
           ref={editInputRef}
@@ -1162,9 +1583,7 @@ function AllocationBar({
       ) : (
         <button
           type="button"
-          onMouseDown={(e) => {
-            e.stopPropagation();
-          }}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             if (!isArchived) {
@@ -1179,9 +1598,10 @@ function AllocationBar({
           {segment.daysPerWeek}
         </button>
       )}
-      {overflowsRight && <span className="opacity-60">›</span>}
+      {overflowsRight && (
+        <ChevronRight size={12} className="opacity-60 shrink-0" aria-hidden />
+      )}
 
-      {/* Resize handle right */}
       {!isArchived && (
         <div
           onMouseDown={(e) => onResizeEdgeMouseDown(e, "right")}
