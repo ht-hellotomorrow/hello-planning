@@ -864,8 +864,13 @@ export function Timeline({
                   personSegs.map((s) => s.projectId),
                 );
                 const expanded = !collapsedPeople.has(p.id);
+                // Personal projects do not count toward capacity/overbooking.
+                const countableSegs = personSegs.filter(
+                  (s) =>
+                    projectById[s.projectId]?.category !== "personal",
+                );
                 const weeklyTotals = weeklyTotalsForSegments(
-                  personSegs,
+                  countableSegs,
                   weekISOs,
                 );
 
@@ -1094,6 +1099,9 @@ function PersonSidebarHeader({
           <div className="text-sm font-medium truncate">
             {person.firstName} {person.lastName}
           </div>
+          <div className="text-[11px] text-muted-foreground tabular-nums leading-tight">
+            {person.capacityDaysPerWeek} d/wk
+          </div>
         </div>
       </Link>
       <button
@@ -1217,12 +1225,22 @@ function PersonWeeklyTotalsRow({
     >
       {weeklyTotals.map((total, i) => {
         const over = total > capacity;
+        const empty = total === 0;
         return (
           <div
             key={weekISOs[i]}
+            title={
+              empty
+                ? undefined
+                : `${formatTotal(total)} / ${capacity} d/wk${over ? " · overbooked" : ""}`
+            }
             className={`flex items-center justify-center text-xs tabular-nums border-r border-grid-line last:border-r-0 ${
-              i === todayWeekIndex ? "bg-brand/5" : ""
-            } ${over ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
+              over
+                ? "bg-red-100 text-red-700 font-semibold"
+                : i === todayWeekIndex
+                  ? "bg-brand/5 text-muted-foreground"
+                  : "text-muted-foreground"
+            }`}
           >
             {formatTotal(total)}
           </div>
