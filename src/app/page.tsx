@@ -70,7 +70,7 @@ async function loadPeople() {
     })
     .from(people)
     .where(eq(people.archived, false))
-    .orderBy(asc(people.firstName));
+    .orderBy(asc(people.sortOrder), asc(people.firstName));
 }
 
 async function loadProjects() {

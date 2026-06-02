@@ -8,6 +8,13 @@
       "when": 1779874192735,
       "tag": "0000_mean_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1780417630828,
+      "tag": "0001_lucky_fixer",
+      "breakpoints": true
     }
   ]
 }

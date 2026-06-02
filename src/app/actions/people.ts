@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { people } from "@/db/schema";
 
@@ -22,11 +22,18 @@ export async function addPerson(formData: FormData) {
   if (!firstName) throw new Error("First name required");
   const capacity = validateCapacity(capacityRaw);
 
+  // New people go at the bottom of the list.
+  const maxRow = await db
+    .select({ max: sql<number | null>`max(${people.sortOrder})` })
+    .from(people);
+  const nextOrder = (maxRow[0]?.max ?? -1) + 1;
+
   await db.insert(people).values({
     firstName,
     lastName,
     propicUrl,
     capacityDaysPerWeek: capacity,
+    sortOrder: nextOrder,
   });
 
   revalidatePath("/");
@@ -68,6 +75,18 @@ export async function archivePerson(id: string) {
 
 export async function unarchivePerson(id: string) {
   await db.update(people).set({ archived: false }).where(eq(people.id, id));
+  revalidatePath("/");
+  revalidatePath("/people");
+}
+
+export async function reorderPeople(orderedIds: string[]) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return;
+  // One UPDATE per id. Small list (<50), parallelizable.
+  await Promise.all(
+    orderedIds.map((id, i) =>
+      db.update(people).set({ sortOrder: i }).where(eq(people.id, id)),
+    ),
+  );
   revalidatePath("/");
   revalidatePath("/people");
 }

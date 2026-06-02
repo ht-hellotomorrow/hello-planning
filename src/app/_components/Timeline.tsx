@@ -883,7 +883,7 @@ export function Timeline({
                   >
                     {/* Person summary row */}
                     <div
-                      className="flex border-b border-grid-line bg-muted/50"
+                      className="flex border-b border-grid-line bg-muted"
                       style={{ height: PERSON_ROW_HEIGHT }}
                     >
                       <PersonSidebarHeader
@@ -1064,7 +1064,7 @@ function PersonSidebarHeader({
 }) {
   return (
     <div
-      className="group shrink-0 flex items-center gap-1 pl-2 pr-2 border-r border-border sticky left-0 z-10 bg-muted/50"
+      className="group shrink-0 flex items-center gap-1 pl-2 pr-2 border-r border-border sticky left-0 z-10 bg-muted"
       style={{ width: SIDEBAR_WIDTH }}
     >
       <button
@@ -1217,7 +1217,7 @@ function PersonWeeklyTotalsRow({
 }) {
   return (
     <div
-      className="grid bg-muted/50"
+      className="grid bg-muted"
       style={{
         gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)`,
         height: PERSON_ROW_HEIGHT,

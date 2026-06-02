@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { asc, desc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { people } from "@/db/schema";
 import { AddPersonForm } from "../_components/AddPersonForm";
 import { LogoutButton } from "../_components/LogoutButton";
 import { PersonCard } from "../_components/PersonCard";
+import { PeopleReorderList } from "../_components/PeopleReorderList";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function PeoplePage() {
       archived: people.archived,
     })
     .from(people)
-    .orderBy(desc(people.archived), asc(people.firstName));
+    .orderBy(asc(people.sortOrder), asc(people.firstName));
 
   const active = rows.filter((p) => !p.archived);
   const archived = rows.filter((p) => p.archived);
@@ -70,13 +71,7 @@ export default async function PeoplePage() {
               No active people yet.
             </p>
           ) : (
-            <ul className="space-y-2">
-              {active.map((p) => (
-                <li key={p.id} id={p.id}>
-                  <PersonCard person={p} />
-                </li>
-              ))}
-            </ul>
+            <PeopleReorderList initial={active} />
           )}
         </section>
 

@@ -17,6 +17,7 @@ export const people = sqliteTable("people", {
   propicUrl: text("propic_url"),
   capacityDaysPerWeek: real("capacity_days_per_week").notNull().default(5),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(current_timestamp)`),
