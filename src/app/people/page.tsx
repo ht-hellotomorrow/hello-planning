@@ -30,9 +30,14 @@ export default async function PeoplePage() {
     <div className="flex-1 flex flex-col min-h-0">
       <header className="px-6 py-3 border-b border-border flex items-center justify-between gap-4 bg-background shrink-0">
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-brand text-accent text-base font-extrabold">
-            H!
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/ht-logo.png"
+            alt="Hello Tomorrow"
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-md object-cover"
+          />
           <div>
             <h1 className="text-base font-bold tracking-tight leading-tight">
               People

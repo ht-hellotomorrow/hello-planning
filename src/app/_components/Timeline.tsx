@@ -325,7 +325,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return 0;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       return Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
@@ -429,7 +430,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       const idx = Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
@@ -450,7 +452,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       const mouseIdx = Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
@@ -479,7 +482,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       const idx = Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
@@ -633,7 +637,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       const splitIdx = Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),
@@ -681,7 +686,8 @@ export function Timeline({
       const scroller = scrollRef.current;
       if (!scroller) return;
       const scRect = scroller.getBoundingClientRect();
-      const xInScroller = clientX - scRect.left + scroller.scrollLeft;
+      const xInScroller =
+        clientX - scRect.left + scroller.scrollLeft - SIDEBAR_WIDTH;
       const idx = Math.max(
         0,
         Math.min(WEEKS_TOTAL - 1, Math.floor(xInScroller / WEEK_WIDTH)),

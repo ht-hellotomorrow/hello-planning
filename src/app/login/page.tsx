@@ -33,9 +33,14 @@ function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand text-accent text-3xl font-extrabold mb-3">
-          H!
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/ht-logo.png"
+          alt="Hello Tomorrow"
+          width={64}
+          height={64}
+          className="w-16 h-16 rounded-2xl object-cover mb-3 mx-auto"
+        />
         <h1 className="text-2xl font-bold tracking-tight">Hello Planning</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Sign in with the company password
