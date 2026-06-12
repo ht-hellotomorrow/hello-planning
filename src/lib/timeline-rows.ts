@@ -1,5 +1,9 @@
 import { parseISO, weeksBetween } from "@/lib/weeks";
 
+function compareLabels(a: string, b: string): number {
+  return a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
+}
+
 export type SegmentRange = {
   startWeek: string;
   endWeek: string;
@@ -52,12 +56,12 @@ export function sortProjectIds(
   const unique = [...new Set(projectIds)];
   if (!order?.length) {
     return unique.sort((a, b) =>
-      (nameById[a] ?? a).localeCompare(nameById[b] ?? b),
+      compareLabels(nameById[a] ?? a, nameById[b] ?? b),
     );
   }
   const ordered = order.filter((id) => unique.includes(id));
   const rest = unique
     .filter((id) => !order.includes(id))
-    .sort((a, b) => (nameById[a] ?? a).localeCompare(nameById[b] ?? b));
+    .sort((a, b) => compareLabels(nameById[a] ?? a, nameById[b] ?? b));
   return [...ordered, ...rest];
 }

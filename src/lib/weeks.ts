@@ -55,6 +55,25 @@ export function dayMonth(d: Date): string {
   return `${d.getUTCDate()}`;
 }
 
+const MONTH_ABBR = [
+  "GEN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAG",
+  "GIU",
+  "LUG",
+  "AGO",
+  "SET",
+  "OTT",
+  "NOV",
+  "DIC",
+];
+
+export function weekDayLabel(d: Date): string {
+  return `${d.getUTCDate()} ${MONTH_ABBR[d.getUTCMonth()]}`;
+}
+
 export type MonthSpan = { label: string; count: number };
 
 export function groupByMonth(weeks: Date[]): MonthSpan[] {

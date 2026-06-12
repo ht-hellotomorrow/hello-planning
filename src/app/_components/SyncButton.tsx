@@ -12,7 +12,7 @@ type SyncResponse = {
   error?: string;
 };
 
-export function SyncButton() {
+export function SyncButton({ compact = false }: { compact?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{
     kind: "ok" | "err";
@@ -46,12 +46,16 @@ export function SyncButton() {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className={`flex flex-col gap-1 ${compact ? "items-stretch" : "items-end"}`}>
       <button
         type="button"
         onClick={onClick}
         disabled={loading}
-        className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 transition"
+        className={`rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-brand/30 ${
+          compact
+            ? "px-3 py-1.5 text-xs whitespace-nowrap"
+            : "px-4 py-2 text-sm"
+        }`}
       >
         {loading ? "Syncing…" : "Sync Airtable"}
       </button>

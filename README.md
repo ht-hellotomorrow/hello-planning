@@ -49,9 +49,9 @@ Prerequisiti: Node 22+, npm.
 
 | Categoria | Sorgente | Palette |
 |---|---|---|
-| `HT Internal` | Airtable + flag `Internal=true` (codice contiene `HT`) | viola |
-| `HT Client` | Airtable + `Internal=false` | rossi/arancio |
-| `Personal` | Creato in app (Fase 5, in arrivo) | grigio + bordo tratteggiato |
+| `INTERNAL` (`ht_internal`) | Airtable + flag `Internal=true` | viola |
+| `EXTERNAL` (`ht_client`) | Airtable + `Internal=false` | rosso |
+| `PERSONAL` (`personal`) | Creato in app | grigio + bordo tratteggiato |
 
 **Mappatura status Airtable → visibilità**:
 
@@ -68,8 +68,8 @@ Sulla timeline puoi:
 - **Click sul `+`** che appare in hover sulla persona → stessa modale precompilata
 - **Trascinare** il corpo di una barra → sposta nel tempo (snap al lunedì)
 - **Trascinare** i bordi → resize (snap al lunedì)
-- **Click sul numero** dentro la barra → edit inline dei giorni/sett
-- **Shift+click** su una barra → spezza in quel punto (Fase 4b)
+- **Doppio click** su una barra → modale edit (giorni/sett, periodo)
+- **Shift+click** su una barra → spezza in quel punto
 - **Click destro** su una barra → elimina (con conferma)
 
 **Capacity**: rappresenta la disponibilità per Hello Tomorrow. Le allocazioni su progetti personali si vedono ma **non contano** nel calcolo dell'overbooking (in arrivo nella Fase 6).

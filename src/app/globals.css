@@ -20,16 +20,9 @@
   --accent: #56e0b0;
   --accent-soft: #d9f7e9;
 
-  /* Category palettes — barre-progetto. Tinte scelte deterministicamente
-     dall'id progetto dentro la famiglia. Personali = grigio unico. */
-  --cat-client-1: #f4a8a8;
-  --cat-client-2: #ee8888;
-  --cat-client-3: #e36b6b;
-  --cat-client-4: #c54d4d;
-  --cat-internal-1: #b8a5f1;
-  --cat-internal-2: #9c83e7;
-  --cat-internal-3: #7e62db;
-  --cat-internal-4: #5e40bd;
+  /* Category colors — one per category */
+  --cat-internal: #7e62db;
+  --cat-external: #e36b6b;
   --cat-personal: #a1a1aa;
   --cat-archived: #d4d4d8;
 }

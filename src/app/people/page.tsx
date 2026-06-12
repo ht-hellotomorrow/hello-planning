@@ -4,6 +4,7 @@ import { asc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { people } from "@/db/schema";
 import { AddPersonForm } from "../_components/AddPersonForm";
+import { AppLogo } from "../_components/AppLogo";
 import { LogoutButton } from "../_components/LogoutButton";
 import { PersonCard } from "../_components/PersonCard";
 import { PeopleReorderList } from "../_components/PeopleReorderList";
@@ -30,14 +31,7 @@ export default async function PeoplePage() {
     <div className="flex-1 flex flex-col min-h-0">
       <header className="px-6 py-3 border-b border-border flex items-center justify-between gap-4 bg-background shrink-0">
         <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/ht-logo.png"
-            alt="Hello Tomorrow"
-            width={36}
-            height={36}
-            className="w-9 h-9 rounded-md object-cover"
-          />
+          <AppLogo size={36} showWordmark={false} />
           <div>
             <h1 className="text-base font-bold tracking-tight leading-tight">
               People

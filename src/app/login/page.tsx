@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AppLogo } from "../_components/AppLogo";
 
 function LoginForm() {
   const [password, setPassword] = useState("");
@@ -32,16 +33,9 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-      <div className="text-center mb-8">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/ht-logo.png"
-          alt="Hello Tomorrow"
-          width={64}
-          height={64}
-          className="w-16 h-16 rounded-2xl object-cover mb-3 mx-auto"
-        />
-        <h1 className="text-2xl font-bold tracking-tight">Hello Planning</h1>
+      <div className="text-center mb-8 flex flex-col items-center">
+        <AppLogo size={64} className="mb-3 justify-center" />
+        <h1 className="text-2xl font-bold tracking-tight sr-only">hello planning</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Sign in with the company password
         </p>

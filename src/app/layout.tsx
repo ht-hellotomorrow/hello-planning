@@ -9,8 +9,20 @@ const workSans = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Hello Planning",
+  title: "hello planning",
   description: "Resource planning — Hello Tomorrow",
+  icons: {
+    icon: [
+      {
+        url: "/favicon-b.svg",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/favicon-w.svg",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

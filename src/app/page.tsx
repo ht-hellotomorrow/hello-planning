@@ -7,7 +7,7 @@ import {
   projects,
 } from "@/db/schema";
 import { todayMondayISO } from "@/lib/weeks";
-import { Timeline } from "./_components/Timeline";
+import { TimelineClient } from "./_components/TimelineClient";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function Home() {
   }
 
   return (
-    <Timeline
+    <TimelineClient
       people={peopleRows}
       projects={projectRows}
       segments={segmentRows}
