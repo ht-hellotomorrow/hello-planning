@@ -60,3 +60,12 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "tnum";
 }
+
+@keyframes indeterminate {
+  0% {
+    left: -33%;
+  }
+  100% {
+    left: 100%;
+  }
+}

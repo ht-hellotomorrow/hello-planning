@@ -232,7 +232,21 @@ export function Timeline({
     segments,
     optimisticReducer,
   );
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  function notifyError(scope: string, err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : `${scope} failed unexpectedly`;
+    setActionError(msg);
+    console.error(scope, err);
+  }
+
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(null), 5000);
+    return () => clearTimeout(t);
+  }, [actionError]);
 
   const [drag, setDrag] = useState<DragState>(null);
   const [pendingCreate, setPendingCreate] =
@@ -306,7 +320,7 @@ export function Timeline({
         try {
           await savePersonProjectOrder(personId, next);
         } catch (err) {
-          console.error("reorder failed", err);
+          notifyError("Reorder", err);
         }
       });
     },
@@ -378,7 +392,7 @@ export function Timeline({
                   endWeek: endISO,
                 });
               } catch (err) {
-                console.error("move failed", err);
+                notifyError("Move", err);
               }
             });
           }
@@ -409,7 +423,7 @@ export function Timeline({
                 endWeek: endISO,
               });
             } catch (err) {
-              console.error("resize failed", err);
+              notifyError("Resize", err);
             }
           });
         }
@@ -528,7 +542,7 @@ export function Timeline({
             daysPerWeek: input.daysPerWeek,
           });
         } catch (err) {
-          console.error("edit failed", err);
+          notifyError("Edit", err);
         }
       });
       return;
@@ -555,7 +569,7 @@ export function Timeline({
           daysPerWeek: input.daysPerWeek,
         });
       } catch (err) {
-        console.error("create failed", err);
+        notifyError("Create", err);
       }
     });
   }
@@ -611,7 +625,7 @@ export function Timeline({
         try {
           await updateSegment(segId, { daysPerWeek: newDays });
         } catch (err) {
-          console.error("update days failed", err);
+          notifyError("Update days", err);
         }
       });
     },
@@ -625,7 +639,7 @@ export function Timeline({
         try {
           await deleteSegment(segId);
         } catch (err) {
-          console.error("delete failed", err);
+          notifyError("Delete", err);
         }
       });
     },
@@ -670,7 +684,7 @@ export function Timeline({
         try {
           await splitSegment({ id: segment.id, splitAtWeek: splitISO });
         } catch (err) {
-          console.error("split failed", err);
+          notifyError("Split", err);
         }
       });
     },
@@ -770,6 +784,16 @@ export function Timeline({
         </div>
       </header>
 
+      {/* Pending indicator: thin indeterminate bar shown during transitions */}
+      <div
+        className={`relative h-0.5 overflow-hidden shrink-0 transition-opacity ${
+          isPending ? "opacity-100" : "opacity-0"
+        }`}
+        aria-hidden
+      >
+        <div className="absolute inset-y-0 w-1/3 bg-brand animate-[indeterminate_1.2s_ease-in-out_infinite]" />
+      </div>
+
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div ref={scrollRef} className="flex-1 overflow-auto bg-muted">
           <div style={{ minWidth: totalContentWidth }}>
@@ -846,18 +870,26 @@ export function Timeline({
             {/* Body rows */}
             {people.length === 0 ? (
               <div
-                className="flex bg-background"
-                style={{ width: totalContentWidth }}
+                className="sticky left-0 bg-background"
+                style={{ width: "100%" }}
               >
-                <div
-                  className="p-4 text-sm text-muted-foreground border-r border-border sticky left-0 bg-background"
-                  style={{ width: SIDEBAR_WIDTH }}
-                >
-                  No people yet.{" "}
-                  <Link href="/people" className="text-brand hover:underline">
-                    Add one
+                <div className="mx-auto max-w-md text-center py-16 px-6">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-soft text-brand mb-4">
+                    <Plus size={28} aria-hidden />
+                  </div>
+                  <h2 className="text-lg font-semibold mb-1">
+                    No people yet
+                  </h2>
+                  <p className="text-sm text-muted-foreground mb-5">
+                    Add your team to start scheduling work.
+                  </p>
+                  <Link
+                    href="/people"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
+                  >
+                    <Plus size={16} aria-hidden />
+                    Add your first person
                   </Link>
-                  .
                 </div>
               </div>
             ) : (

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { projects } from "@/db/schema";
 import { fetchAllProjects } from "./airtable";
@@ -33,48 +33,50 @@ export type SyncResult = {
 
 export async function syncProjects(): Promise<SyncResult> {
   const start = Date.now();
-  const records = await fetchAllProjects();
+  const [records, existingRows] = await Promise.all([
+    fetchAllProjects(),
+    db
+      .select({ id: projects.id, airtableRecordId: projects.airtableRecordId })
+      .from(projects)
+      .where(sql`${projects.airtableRecordId} is not null`),
+  ]);
 
-  let added = 0;
-  let updated = 0;
+  const existingIds = new Set(existingRows.map((r) => r.airtableRecordId!));
 
-  for (const rec of records) {
+  const rows = records.map((rec) => {
     const f = rec.fields;
-    const visibility = statusToVisibility(f.Status);
-    const category = categoryFrom(f.Internal);
-    const name = f["Project Name"] ?? f.Code ?? "Senza nome";
+    return {
+      airtableRecordId: rec.id,
+      source: "airtable" as const,
+      category: categoryFrom(f.Internal),
+      code: f.Code ?? null,
+      name: f["Project Name"] ?? f.Code ?? "Senza nome",
+      status: f.Status ?? null,
+      visibility: statusToVisibility(f.Status),
+    };
+  });
 
-    const existing = await db.query.projects.findFirst({
-      where: eq(projects.airtableRecordId, rec.id),
-    });
-
-    if (existing) {
-      await db
-        .update(projects)
-        .set({
-          source: "airtable",
-          category,
-          code: f.Code ?? null,
-          name,
-          status: f.Status ?? null,
-          visibility,
+  // Single upsert — one round-trip regardless of record count
+  if (rows.length > 0) {
+    await db
+      .insert(projects)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: projects.airtableRecordId,
+        set: {
+          source: sql`excluded.source`,
+          category: sql`excluded.category`,
+          code: sql`excluded.code`,
+          name: sql`excluded.name`,
+          status: sql`excluded.status`,
+          visibility: sql`excluded.visibility`,
           updatedAt: sql`current_timestamp`,
-        })
-        .where(eq(projects.id, existing.id));
-      updated++;
-    } else {
-      await db.insert(projects).values({
-        airtableRecordId: rec.id,
-        source: "airtable",
-        category,
-        code: f.Code ?? null,
-        name,
-        status: f.Status ?? null,
-        visibility,
+        },
       });
-      added++;
-    }
   }
+
+  const added = rows.filter((r) => !existingIds.has(r.airtableRecordId)).length;
+  const updated = rows.length - added;
 
   return {
     added,
