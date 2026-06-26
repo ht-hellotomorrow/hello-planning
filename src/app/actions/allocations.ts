@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { allocationSegments } from "@/db/schema";
 
@@ -81,6 +81,14 @@ export async function updateSegment(id: string, patch: UpdateSegmentInput) {
 export async function deleteSegment(id: string) {
   if (!id) throw new Error("Id required");
   await db.delete(allocationSegments).where(eq(allocationSegments.id, id));
+  revalidatePath("/");
+}
+
+export async function deleteSegmentsByIds(ids: string[]) {
+  if (!ids.length) return;
+  await db
+    .delete(allocationSegments)
+    .where(inArray(allocationSegments.id, ids));
   revalidatePath("/");
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -51,6 +51,7 @@ type Props = {
     personName: string,
     defaultProjectId?: string,
   ) => void;
+  onOpenCreateForProject: (projectId: string) => void;
   onStartCreateDrag: (
     personId: string,
     projectId: string | undefined,
@@ -82,6 +83,7 @@ export function ProjectsView({
   onToggleProject,
   onSetHoveredRowKey,
   onOpenCreateForPerson,
+  onOpenCreateForProject,
   onStartCreateDrag,
   onStartMove,
   onStartResize,
@@ -271,10 +273,8 @@ export function ProjectsView({
 
                     {projectExpanded && (
                       <AssignPersonRow
-                        people={people}
-                        assignedPersonIds={personIds}
                         projectId={project.id}
-                        onAssign={onOpenCreateForPerson}
+                        onOpen={onOpenCreateForProject}
                         weekISOs={weekISOs}
                       />
                     )}
@@ -289,79 +289,30 @@ export function ProjectsView({
 }
 
 function AssignPersonRow({
-  people,
-  assignedPersonIds,
   projectId,
-  onAssign,
+  onOpen,
   weekISOs,
 }: {
-  people: Person[];
-  assignedPersonIds: string[];
   projectId: string;
-  onAssign: (
-    personId: string,
-    personName: string,
-    defaultProjectId?: string,
-  ) => void;
+  onOpen: (projectId: string) => void;
   weekISOs: string[];
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open]);
-
   return (
     <div className="flex" style={{ height: 32 }}>
       <div
-        ref={rootRef}
-        className="shrink-0 flex items-center sticky left-0 bg-background border-r border-border relative"
+        className="shrink-0 flex items-center sticky left-0 bg-background border-r border-border"
         style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
       >
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => onOpen(projectId)}
           className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-brand/70 hover:text-brand hover:bg-brand/5 rounded ml-9 transition-colors"
         >
           <Plus size={12} aria-hidden />
           Assign person
         </button>
-        {open && (
-          <ul className="absolute left-9 right-3 top-full mt-1 z-50 py-1 rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
-            {people.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    onAssign(p.id, p.firstName, projectId);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
-                >
-                  {p.firstName} {p.lastName}
-                  {assignedPersonIds.includes(p.id) && (
-                    <span className="text-muted-foreground text-xs ml-1">
-                      (already assigned)
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
-      <div
-        className="relative"
-        style={{ width: weekISOs.length * WEEK_WIDTH }}
-      >
+      <div className="relative" style={{ width: weekISOs.length * WEEK_WIDTH }}>
         <div
           className="absolute inset-0 grid pointer-events-none"
           style={{ gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)` }}

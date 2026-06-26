@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { projects } from "@/db/schema";
 
@@ -29,4 +30,12 @@ export async function createPersonalProject(
 
   revalidatePath("/");
   return { id };
+}
+
+export async function deletePersonalProject(id: string) {
+  if (!id) throw new Error("Id required");
+  await db
+    .delete(projects)
+    .where(and(eq(projects.id, id), eq(projects.source, "local")));
+  revalidatePath("/");
 }

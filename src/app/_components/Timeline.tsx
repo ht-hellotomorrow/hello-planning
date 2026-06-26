@@ -306,6 +306,7 @@ export function Timeline({
           startWeek: weekISOs[start],
           endWeek: weekISOs[end],
           defaultProjectId: d.projectId,
+          datesFromDrag: true,
         });
       } else if (d.kind === "move") {
         const offset = d.currentMouseIdx - d.mouseAnchorIdx;
@@ -482,10 +483,13 @@ export function Timeline({
       return;
     }
 
+    const effectivePersonId = input.personId ?? draft.personId;
+    if (!effectivePersonId) return;
+
     const tempId = `temp-${crypto.randomUUID()}`;
     const tempSegment: AllocationSegment = {
       id: tempId,
-      personId: draft.personId,
+      personId: effectivePersonId,
       projectId: input.projectId,
       startWeek: input.startWeek,
       endWeek: input.endWeek,
@@ -495,7 +499,7 @@ export function Timeline({
       applyOptimistic({ type: "create", segment: tempSegment });
       try {
         await createSegment({
-          personId: draft.personId,
+          personId: effectivePersonId,
           projectId: input.projectId,
           startWeek: input.startWeek,
           endWeek: input.endWeek,
@@ -544,6 +548,23 @@ export function Timeline({
       startWeek: isoDate(startDate),
       endWeek: isoDate(endDate),
       defaultProjectId,
+    });
+  }
+
+  function openCreateForProject(projectId: string) {
+    const project = projectById[projectId];
+    if (!project) return;
+    const startDate = todayMonday;
+    const endDate = addWeeks(startDate, 3);
+    setPendingCreate({
+      startWeek: isoDate(startDate),
+      endWeek: isoDate(endDate),
+      lockedProject: {
+        id: project.id,
+        name: project.name,
+        code: project.code,
+        category: project.category,
+      },
     });
   }
 
@@ -735,6 +756,7 @@ export function Timeline({
                 }
                 onSetHoveredRowKey={setHoveredRowKey}
                 onOpenCreateForPerson={openCreateForPerson}
+                onOpenCreateForProject={openCreateForProject}
                 onStartCreateDrag={startCreateDrag}
                 onStartMove={startMoveDrag}
                 onStartResize={startResizeDrag}
@@ -752,6 +774,7 @@ export function Timeline({
         <CreateSegmentModal
           draft={pendingCreate}
           projects={projects}
+          people={people}
           onCancel={() => setPendingCreate(null)}
           onConfirm={onConfirmCreate}
         />

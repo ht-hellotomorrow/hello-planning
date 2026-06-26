@@ -15,7 +15,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
 export const CATEGORY_BADGE_CLASS: Record<Category, string> = {
   ht_internal: "bg-brand-soft text-brand",
   ht_client: "bg-red-100 text-red-700",
-  personal: "bg-muted text-muted-foreground",
+  personal: "bg-yellow-100 text-yellow-700",
 };
 
 export const CATEGORY_COLOR_VAR: Record<Category, string> = {

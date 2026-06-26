@@ -95,7 +95,9 @@ async function loadSegments() {
       endWeek: allocationSegments.endWeek,
       daysPerWeek: allocationSegments.daysPerWeek,
     })
-    .from(allocationSegments);
+    .from(allocationSegments)
+    .innerJoin(projects, eq(allocationSegments.projectId, projects.id))
+    .where(eq(projects.visibility, "active"));
 }
 
 async function loadProjectOrder() {
