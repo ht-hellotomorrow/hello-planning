@@ -20,8 +20,8 @@ type Props = {
   drag: DragState;
   barLabel: (segment: AllocationSegment) => string;
   highlighted: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   onStartCreate: (clientX: number) => void;
   onStartMove: (segment: AllocationSegment, clientX: number) => void;
   onStartResize: (
@@ -78,9 +78,7 @@ export function ProjectTimelineRow({
       onMouseDown={onRowMouseDown}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`relative transition-colors cursor-crosshair select-none ${
-        highlighted ? "bg-muted-hover" : "bg-muted"
-      }`}
+      className={`relative cursor-crosshair select-none bg-muted group-hover:bg-muted-hover`}
       style={{ width: weekISOs.length * WEEK_WIDTH, height: rowHeight }}
     >
       <div

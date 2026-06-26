@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, Plus } from "lucide-react";
 import { CategoryBadge } from "./CategoryBadge";
 import { ProjectTimelineRow } from "./ProjectTimelineRow";
 import { assignLanes } from "@/lib/lanes";
@@ -139,8 +139,9 @@ export function PeopleView({
               />
             </div>
 
-            {expanded &&
-              projectIds.map((projectId) => {
+            {expanded && (
+              <>
+              {projectIds.map((projectId) => {
                 const project = projectById[projectId];
                 if (!project) return null;
                 const projSegs = personSegs.filter(
@@ -159,10 +160,8 @@ export function PeopleView({
                 return (
                   <div
                     key={rowKey}
-                    className={`flex ${highlighted ? "bg-muted-hover" : ""}`}
+                    className="flex group"
                     style={{ height: rowHeight }}
-                    onMouseEnter={() => onSetHoveredRowKey(rowKey)}
-                    onMouseLeave={() => onSetHoveredRowKey(null)}
                   >
                     <ProjectSidebarRow
                       project={project}
@@ -189,9 +188,6 @@ export function PeopleView({
                         onSetDragOverProjectId(null);
                         onReorderProjects(p.id, fromProjectId, projectId);
                       }}
-                      onAssign={() =>
-                        onOpenCreateForPerson(p.id, p.firstName, projectId)
-                      }
                     />
                     <ProjectTimelineRow
                       personId={p.id}
@@ -207,8 +203,6 @@ export function PeopleView({
                         const proj = projectById[s.projectId];
                         return proj?.code ?? proj?.name ?? "";
                       }}
-                      onMouseEnter={() => onSetHoveredRowKey(rowKey)}
-                      onMouseLeave={() => onSetHoveredRowKey(null)}
                       onStartCreate={(clientX) =>
                         onStartCreateDrag(p.id, projectId, clientX)
                       }
@@ -221,6 +215,36 @@ export function PeopleView({
                   </div>
                 );
               })}
+              <div className="flex" style={{ height: 32 }}>
+                <div
+                  className="shrink-0 sticky left-0 bg-background border-r border-border flex items-center"
+                  style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenCreateForPerson(p.id, p.firstName)}
+                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-brand/70 hover:text-brand hover:bg-brand/5 rounded ml-1 transition-colors"
+                  >
+                    <Plus size={12} />
+                    Add project
+                  </button>
+                </div>
+                <div
+                  className="relative"
+                  style={{ width: WEEKS_TOTAL * WEEK_WIDTH }}
+                >
+                  <div
+                    className="absolute inset-0 grid pointer-events-none"
+                    style={{ gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)` }}
+                  >
+                    {weekISOs.map((iso) => (
+                      <div key={iso} className="border-r border-grid-line last:border-r-0" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              </>
+            )}
           </div>
         );
       })}
@@ -282,7 +306,6 @@ function ProjectSidebarRow({
   onDragOver,
   onDragLeave,
   onDrop,
-  onAssign,
 }: {
   project: Project;
   totalDays: number;
@@ -293,7 +316,6 @@ function ProjectSidebarRow({
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (fromProjectId: string) => void;
-  onAssign: () => void;
 }) {
   const label = project.code ?? project.name;
 
@@ -324,12 +346,8 @@ function ProjectSidebarRow({
           /* ignore */
         }
       }}
-      className={`shrink-0 flex items-center gap-1 pl-1 pr-3 border-r border-border sticky left-0 cursor-grab active:cursor-grabbing ${
-        isDragOver
-          ? "bg-brand-soft"
-          : highlighted
-            ? "bg-muted-hover"
-            : "bg-background"
+      className={`shrink-0 flex items-center gap-1 pl-1 pr-3 border-r border-border sticky left-0 cursor-grab active:cursor-grabbing group-hover:bg-muted-hover ${
+        isDragOver ? "bg-brand-soft" : "bg-background"
       }`}
       style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
     >
@@ -338,15 +356,12 @@ function ProjectSidebarRow({
         className="shrink-0 text-muted-foreground/50"
         aria-hidden
       />
-      <CategoryBadge category={project.category} />
-      <button
-        type="button"
-        onClick={onAssign}
-        className="text-sm truncate flex-1 text-left hover:underline min-w-0"
+      <span
+        className="text-sm truncate flex-1 min-w-0"
         title={label}
       >
         {label}
-      </button>
+      </span>
       <span className="text-xs text-muted-foreground tabular-nums shrink-0">
         {formatTotal(totalDays)}
       </span>

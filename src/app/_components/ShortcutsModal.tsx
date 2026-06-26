@@ -1,15 +1,59 @@
 "use client";
 
-import { X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  MousePointerClick,
+  MoveHorizontal,
+  Scissors,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
 
-const SHORTCUTS = [
-  { action: "Edit schedule", shortcut: "Double-click on a bar" },
-  { action: "Move in time", shortcut: "Drag the bar body" },
-  { action: "Resize period", shortcut: "Drag the left or right edge" },
-  { action: "Split segment", shortcut: "Shift + click" },
-  { action: "Delete", shortcut: "Right-click (confirm)" },
+const SHORTCUTS: { action: string; shortcut: string; icon: LucideIcon }[] = [
+  {
+    action: "Edit schedule",
+    shortcut: "Double-click on a bar",
+    icon: MousePointerClick,
+  },
+  {
+    action: "Move in time",
+    shortcut: "Drag the bar body",
+    icon: MoveHorizontal,
+  },
+  {
+    action: "Resize period",
+    shortcut: "Drag the left or right edge",
+    icon: ArrowLeftRight,
+  },
+  {
+    action: "Split segment",
+    shortcut: "Shift + click",
+    icon: Scissors,
+  },
+  {
+    action: "Delete",
+    shortcut: "Right-click (confirm)",
+    icon: Trash2,
+  },
 ];
+
+const SESSION_KEY = "shortcuts_seen";
+
+export function markShortcutsSeen() {
+  try {
+    sessionStorage.setItem(SESSION_KEY, "1");
+  } catch {}
+}
+
+export function shortcutsAlreadySeen(): boolean {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 type Props = {
   open: boolean;
@@ -59,17 +103,23 @@ export function ShortcutsModal({ open, onClose }: Props) {
           </button>
         </header>
         <ul className="p-5 space-y-3">
-          {SHORTCUTS.map((item) => (
-            <li
-              key={item.action}
-              className="flex items-start justify-between gap-4 text-sm"
-            >
-              <span className="text-foreground">{item.action}</span>
-              <span className="text-muted-foreground text-right shrink-0">
-                {item.shortcut}
-              </span>
-            </li>
-          ))}
+          {SHORTCUTS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <li
+                key={item.action}
+                className="flex items-center justify-between gap-4 text-sm"
+              >
+                <span className="flex items-center gap-2.5 text-foreground">
+                  <Icon size={15} className="text-muted-foreground shrink-0" aria-hidden />
+                  {item.action}
+                </span>
+                <span className="text-muted-foreground text-right shrink-0">
+                  {item.shortcut}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>

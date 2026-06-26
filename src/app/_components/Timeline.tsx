@@ -54,7 +54,7 @@ import {
 } from "./CreateSegmentModal";
 import { PeopleView } from "./PeopleView";
 import { ProjectsView } from "./ProjectsView";
-import { ShortcutsModal } from "./ShortcutsModal";
+import { markShortcutsSeen, shortcutsAlreadySeen, ShortcutsModal } from "./ShortcutsModal";
 import { TimelineHeader } from "./TimelineHeader";
 import { TodayMarker } from "./TodayMarker";
 
@@ -152,7 +152,7 @@ export function Timeline({
     null,
   );
   const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(() => !shortcutsAlreadySeen());
 
   const [optimisticSegments, applyOptimistic] = useOptimistic(
     segments,
@@ -759,7 +759,7 @@ export function Timeline({
 
       <ShortcutsModal
         open={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
+        onClose={() => { markShortcutsSeen(); setShortcutsOpen(false); }}
       />
     </div>
   );

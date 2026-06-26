@@ -165,14 +165,11 @@ export function ProjectsView({
                   {CATEGORY_LABEL[category]}
                 </span>
               </button>
-              <div
-                className="bg-muted"
-                style={{ width: totalGridWidth }}
-              />
+              <WeekGrid weekISOs={weekISOs} />
             </div>
 
             {categoryExpanded &&
-              categoryProjects.map(({ project, personIds }) => {
+              categoryProjects.map(({ project, personIds }, projectIndex) => {
                 const projectExpanded = !collapsedProjects.has(project.id);
                 const projectSegs = optimisticSegments.filter(
                   (s) => s.projectId === project.id,
@@ -183,8 +180,13 @@ export function ProjectsView({
                   WEEKS_TOTAL,
                 );
 
+                const isLastProject = projectIndex === categoryProjects.length - 1;
+
                 return (
-                  <div key={project.id}>
+                  <div
+                    key={project.id}
+                    className={!isLastProject ? "border-b border-grid-line" : ""}
+                  >
                     <div className="flex" style={{ height: PERSON_ROW_HEIGHT }}>
                       <button
                         type="button"
@@ -204,10 +206,7 @@ export function ProjectsView({
                           {formatTotal(projectTotal)}
                         </span>
                       </button>
-                      <div
-                        className="bg-muted"
-                        style={{ width: totalGridWidth }}
-                      />
+                      <WeekGrid weekISOs={weekISOs} />
                     </div>
 
                     {projectExpanded &&
@@ -235,15 +234,12 @@ export function ProjectsView({
                         return (
                           <div
                             key={rowKey}
-                            className={`flex ${highlighted ? "bg-muted-hover" : ""}`}
+                            className="flex group"
                             style={{ height: rowHeight }}
-                            onMouseEnter={() => onSetHoveredRowKey(rowKey)}
-                            onMouseLeave={() => onSetHoveredRowKey(null)}
                           >
                             <PersonUnderProjectSidebar
                               person={person}
                               totalDays={totalDays}
-                              highlighted={highlighted}
                             />
                             <ProjectTimelineRow
                               personId={personId}
@@ -254,10 +250,8 @@ export function ProjectsView({
                               weekISOs={weekISOs}
                               rangeStart={rangeStart}
                               drag={drag}
-                              highlighted={highlighted}
+                              highlighted={false}
                               barLabel={() => fullName}
-                              onMouseEnter={() => onSetHoveredRowKey(rowKey)}
-                              onMouseLeave={() => onSetHoveredRowKey(null)}
                               onStartCreate={(clientX) =>
                                 onStartCreateDrag(
                                   personId,
@@ -281,7 +275,7 @@ export function ProjectsView({
                         assignedPersonIds={personIds}
                         projectId={project.id}
                         onAssign={onOpenCreateForPerson}
-                        totalGridWidth={totalGridWidth}
+                        weekISOs={weekISOs}
                       />
                     )}
                   </div>
@@ -299,7 +293,7 @@ function AssignPersonRow({
   assignedPersonIds,
   projectId,
   onAssign,
-  totalGridWidth,
+  weekISOs,
 }: {
   people: Person[];
   assignedPersonIds: string[];
@@ -309,7 +303,7 @@ function AssignPersonRow({
     personName: string,
     defaultProjectId?: string,
   ) => void;
-  totalGridWidth: number;
+  weekISOs: string[];
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -325,26 +319,24 @@ function AssignPersonRow({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  const candidates = people;
-
   return (
-    <div className="flex" style={{ height: SELECT_PROJECT_ROW_HEIGHT }}>
+    <div className="flex" style={{ height: 32 }}>
       <div
         ref={rootRef}
-        className="shrink-0 pl-12 pr-3 flex items-center sticky left-0 bg-background border-r border-border relative"
+        className="shrink-0 flex items-center sticky left-0 bg-background border-r border-border relative"
         style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
       >
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="w-full border border-border rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-brand/30"
+          className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-brand/70 hover:text-brand hover:bg-brand/5 rounded ml-9 transition-colors"
         >
-          <Plus size={14} aria-hidden />
+          <Plus size={12} aria-hidden />
           Assign person
         </button>
         {open && (
-          <ul className="absolute left-12 right-3 top-full mt-1 z-50 py-1 rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
-            {candidates.map((p) => (
+          <ul className="absolute left-9 right-3 top-full mt-1 z-50 py-1 rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+            {people.map((p) => (
               <li key={p.id}>
                 <button
                   type="button"
@@ -357,7 +349,7 @@ function AssignPersonRow({
                   {p.firstName} {p.lastName}
                   {assignedPersonIds.includes(p.id) && (
                     <span className="text-muted-foreground text-xs ml-1">
-                      (assigned)
+                      (already assigned)
                     </span>
                   )}
                 </button>
@@ -366,7 +358,34 @@ function AssignPersonRow({
           </ul>
         )}
       </div>
-      <div className="bg-muted" style={{ width: totalGridWidth }} />
+      <div
+        className="relative"
+        style={{ width: weekISOs.length * WEEK_WIDTH }}
+      >
+        <div
+          className="absolute inset-0 grid pointer-events-none"
+          style={{ gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)` }}
+        >
+          {weekISOs.map((iso) => (
+            <div key={iso} className="border-r border-grid-line last:border-r-0" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeekGrid({ weekISOs }: { weekISOs: string[] }) {
+  return (
+    <div className="relative bg-muted" style={{ width: weekISOs.length * WEEK_WIDTH }}>
+      <div
+        className="absolute inset-0 grid pointer-events-none"
+        style={{ gridTemplateColumns: `repeat(${weekISOs.length}, ${WEEK_WIDTH}px)` }}
+      >
+        {weekISOs.map((iso) => (
+          <div key={iso} className="border-r border-grid-line last:border-r-0" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -374,20 +393,16 @@ function AssignPersonRow({
 function PersonUnderProjectSidebar({
   person,
   totalDays,
-  highlighted,
 }: {
   person: Person;
   totalDays: number;
-  highlighted: boolean;
 }) {
   const initials = `${person.firstName[0] ?? ""}${person.lastName[0] ?? ""}`;
   const fullName = `${person.firstName} ${person.lastName}`.trim();
 
   return (
     <div
-      className={`shrink-0 flex items-center gap-2 pl-10 pr-3 border-r border-border sticky left-0 ${
-        highlighted ? "bg-muted-hover" : "bg-background"
-      }`}
+      className="shrink-0 flex items-center gap-2 pl-10 pr-3 border-r border-border sticky left-0 bg-background group-hover:bg-muted-hover"
       style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
     >
       {person.propicUrl ? (
