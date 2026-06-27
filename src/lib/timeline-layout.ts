@@ -1,4 +1,4 @@
-export const WEEK_WIDTH = 80;
+export const WEEK_WIDTH = 110;
 export const SIDEBAR_WIDTH = 280;
 /** Sticky sidebar sopra barre e linea Today durante lo scroll orizzontale */
 export const SIDEBAR_Z_INDEX = 40;

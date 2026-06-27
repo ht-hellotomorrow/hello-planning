@@ -2,17 +2,29 @@ import { NextResponse } from "next/server";
 import { AUTH_COOKIE, expectedToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { password?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    username?: string;
+    password?: string;
+  };
+  const username = body.username;
   const password = body.password;
 
-  if (!process.env.SHARED_PASSWORD) {
+  if (!process.env.SHARED_PASSWORD || !process.env.SHARED_USERNAME) {
     return NextResponse.json(
-      { error: "SHARED_PASSWORD non configurata" },
+      { error: "SHARED_USERNAME o SHARED_PASSWORD non configurata" },
       { status: 500 },
     );
   }
-  if (!password || password !== process.env.SHARED_PASSWORD) {
-    return NextResponse.json({ error: "Password sbagliata" }, { status: 401 });
+  if (
+    !username ||
+    !password ||
+    username !== process.env.SHARED_USERNAME ||
+    password !== process.env.SHARED_PASSWORD
+  ) {
+    return NextResponse.json(
+      { error: "Username o password sbagliati" },
+      { status: 401 },
+    );
   }
 
   const token = await expectedToken();

@@ -24,6 +24,7 @@ Prerequisiti: Node 22+, npm.
    ```
 
    Variabili da riempire:
+   - `SHARED_USERNAME` — username aziendale unico per il login
    - `SHARED_PASSWORD` — password aziendale unica per il login
    - `AIRTABLE_PAT` — Personal Access Token da [airtable.com/create/tokens](https://airtable.com/create/tokens) con scope `data.records:read` + `schema.bases:read`, limitato alla base `HT Control Room`
    - `CRON_SECRET` — qualunque stringa random (`openssl rand -hex 32`)
@@ -39,7 +40,7 @@ Prerequisiti: Node 22+, npm.
    npm run dev
    ```
 
-5. Apri http://localhost:3000, fai login con `SHARED_PASSWORD`, premi "Sincronizza ora" per popolare i progetti.
+5. Apri http://localhost:3000, fai login con `SHARED_USERNAME` + `SHARED_PASSWORD`, premi "Sincronizza ora" per popolare i progetti.
 
 ## Concetti
 
@@ -82,7 +83,7 @@ Netlify rileva Next.js automaticamente e usa il Next.js Runtime. La Scheduled Fu
 
 Variabili d'ambiente da impostare sul sito Netlify (Site settings → Environment variables):
 
-- `SHARED_PASSWORD`
+- `SHARED_USERNAME`, `SHARED_PASSWORD`
 - `AIRTABLE_PAT`, `AIRTABLE_BASE_ID`, `AIRTABLE_PROJECTS_TABLE_ID`
 - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 - `CRON_SECRET`

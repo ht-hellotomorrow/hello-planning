@@ -13,7 +13,8 @@ async function sha256(input: string): Promise<string> {
 export async function expectedToken(): Promise<string | null> {
   const secret = process.env.SHARED_PASSWORD;
   if (!secret) return null;
-  return sha256(`hp:${secret}`);
+  const username = process.env.SHARED_USERNAME ?? "";
+  return sha256(`hp:${username}:${secret}`);
 }
 
 export async function isAuthed(token: string | undefined): Promise<boolean> {
