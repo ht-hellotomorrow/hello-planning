@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { projects } from "@/db/schema";
+import { isFerieProject } from "@/lib/ferie";
 
 export type CreatePersonalProjectInput = {
   name: string;
@@ -34,6 +35,9 @@ export async function createPersonalProject(
 
 export async function deletePersonalProject(id: string) {
   if (!id) throw new Error("Id required");
+  if (isFerieProject(id)) {
+    throw new Error("Il progetto FERIE non può essere eliminato");
+  }
   await db
     .delete(projects)
     .where(and(eq(projects.id, id), eq(projects.source, "local")));

@@ -24,6 +24,7 @@ import {
   totalPlannedDays,
   weeklyTotalsForSegments,
 } from "@/lib/timeline-rows";
+import { FERIE_PROJECT_ID, isFerieProject } from "@/lib/ferie";
 
 type Props = {
   people: Person[];
@@ -96,10 +97,15 @@ export function PeopleView({
         const personSegs = optimisticSegments.filter(
           (s) => s.personId === p.id,
         );
-        const projectIds = getProjectOrder(
+        // FERIE è sempre la prima riga e non è riordinabile.
+        const orderedIds = getProjectOrder(
           p.id,
           personSegs.map((s) => s.projectId),
         );
+        const projectIds = [
+          FERIE_PROJECT_ID,
+          ...orderedIds.filter((id) => !isFerieProject(id)),
+        ];
         const expanded = !collapsedPeople.has(p.id);
         const countableSegs = personSegs.filter(
           (s) => projectById[s.projectId]?.category !== "personal",
@@ -168,6 +174,7 @@ export function PeopleView({
                       totalDays={totalDays}
                       personId={p.id}
                       projectId={projectId}
+                      locked={isFerieProject(projectId)}
                       highlighted={highlighted}
                       isDragOver={dragOverProjectId === projectId}
                       onDragOver={(e) => {
@@ -301,6 +308,7 @@ function ProjectSidebarRow({
   totalDays,
   personId,
   projectId,
+  locked = false,
   highlighted,
   isDragOver,
   onDragOver,
@@ -311,6 +319,7 @@ function ProjectSidebarRow({
   totalDays: number;
   personId: string;
   projectId: string;
+  locked?: boolean;
   highlighted: boolean;
   isDragOver: boolean;
   onDragOver: (e: React.DragEvent) => void;
@@ -321,41 +330,53 @@ function ProjectSidebarRow({
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData(
-          PROJECT_ROW_DRAG,
-          JSON.stringify({ personId, projectId }),
-        );
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => {
-        const raw = e.dataTransfer.getData(PROJECT_ROW_DRAG);
-        if (!raw) return;
-        e.preventDefault();
-        try {
-          const data = JSON.parse(raw) as {
-            personId: string;
-            projectId: string;
-          };
-          if (data.personId !== personId) return;
-          onDrop(data.projectId);
-        } catch {
-          /* ignore */
-        }
-      }}
-      className={`shrink-0 flex items-center gap-1 pl-1 pr-3 border-r border-border sticky left-0 cursor-grab active:cursor-grabbing group-hover:bg-muted-hover ${
-        isDragOver ? "bg-brand-soft" : "bg-background"
-      }`}
+      draggable={!locked}
+      onDragStart={
+        locked
+          ? undefined
+          : (e) => {
+              e.dataTransfer.setData(
+                PROJECT_ROW_DRAG,
+                JSON.stringify({ personId, projectId }),
+              );
+              e.dataTransfer.effectAllowed = "move";
+            }
+      }
+      onDragOver={locked ? undefined : onDragOver}
+      onDragLeave={locked ? undefined : onDragLeave}
+      onDrop={
+        locked
+          ? undefined
+          : (e) => {
+              const raw = e.dataTransfer.getData(PROJECT_ROW_DRAG);
+              if (!raw) return;
+              e.preventDefault();
+              try {
+                const data = JSON.parse(raw) as {
+                  personId: string;
+                  projectId: string;
+                };
+                if (data.personId !== personId) return;
+                onDrop(data.projectId);
+              } catch {
+                /* ignore */
+              }
+            }
+      }
+      className={`shrink-0 flex items-center gap-1 pl-1 pr-3 border-r border-border sticky left-0 group-hover:bg-muted-hover ${
+        locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+      } ${isDragOver ? "bg-brand-soft" : "bg-background"}`}
       style={{ width: SIDEBAR_WIDTH, zIndex: SIDEBAR_Z_INDEX }}
     >
-      <GripVertical
-        size={14}
-        className="shrink-0 text-muted-foreground/50"
-        aria-hidden
-      />
+      {locked ? (
+        <span className="shrink-0 w-[14px]" aria-hidden />
+      ) : (
+        <GripVertical
+          size={14}
+          className="shrink-0 text-muted-foreground/50"
+          aria-hidden
+        />
+      )}
       <span
         className="text-sm truncate flex-1 min-w-0"
         title={label}

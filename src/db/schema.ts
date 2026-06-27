@@ -32,7 +32,7 @@ export const projects = sqliteTable(
     airtableRecordId: text("airtable_record_id").unique(),
     source: text("source", { enum: ["airtable", "local"] }).notNull(),
     category: text("category", {
-      enum: ["ht_internal", "ht_client", "personal"],
+      enum: ["ht_internal", "ht_client", "personal", "ferie"],
     }).notNull(),
     code: text("code"),
     name: text("name").notNull(),

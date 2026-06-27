@@ -7,9 +7,26 @@ import {
   projects,
 } from "@/db/schema";
 import { todayMondayISO } from "@/lib/weeks";
+import { FERIE_PROJECT_ID, FERIE_PROJECT_NAME } from "@/lib/ferie";
 import { TimelineClient } from "./_components/TimelineClient";
 
 export const dynamic = "force-dynamic";
+
+// Garantisce l'esistenza dell'unico progetto di sistema "🏖️ FERIE".
+async function ensureFerieProject() {
+  await db
+    .insert(projects)
+    .values({
+      id: FERIE_PROJECT_ID,
+      source: "local",
+      category: "ferie",
+      code: null,
+      name: FERIE_PROJECT_NAME,
+      status: null,
+      visibility: "active",
+    })
+    .onConflictDoNothing();
+}
 
 export default async function Home() {
   let peopleRows: Awaited<ReturnType<typeof loadPeople>> = [];
@@ -19,6 +36,7 @@ export default async function Home() {
   let dbError: string | null = null;
 
   try {
+    await ensureFerieProject();
     [peopleRows, projectRows, segmentRows, projectOrderRows] =
       await Promise.all([
         loadPeople(),

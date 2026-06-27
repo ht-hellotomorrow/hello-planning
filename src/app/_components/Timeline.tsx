@@ -14,7 +14,6 @@ import {
 } from "react";
 import {
   addWeeks,
-  firstMondayOfMonthOffset,
   groupByMonth,
   isoDate,
   parseISO,
@@ -31,7 +30,8 @@ import {
   updateSegment,
 } from "@/app/actions/allocations";
 import { savePersonProjectOrder } from "@/app/actions/person-project-order";
-import { type Category } from "@/lib/categories";
+import { type Category, CATEGORY_ORDER } from "@/lib/categories";
+import { isFerieProject } from "@/lib/ferie";
 import {
   SIDEBAR_WIDTH,
   WEEK_WIDTH,
@@ -180,11 +180,10 @@ export function Timeline({
   const dragRef = useRef<DragState>(null);
   dragRef.current = drag;
 
+  // Apri la griglia su "settimana corrente − 1" (todayWeekIndex è la settimana di oggi).
   const initialScrollLeft = useMemo(() => {
-    const target = firstMondayOfMonthOffset(today, -1);
-    const idx = weeksBetween(rangeStart, target);
-    return Math.max(0, idx) * WEEK_WIDTH;
-  }, [today, rangeStart]);
+    return Math.max(0, todayWeekIndex - 1) * WEEK_WIDTH;
+  }, [todayWeekIndex]);
   const [initialized, setInitialized] = useState(false);
   useEffect(() => {
     if (!scrollRef.current || initialized) return;
@@ -208,11 +207,7 @@ export function Timeline({
       return;
     }
     if (allProjectsExpanded) {
-      const allCategories = new Set<Category>([
-        "ht_internal",
-        "ht_client",
-        "personal",
-      ]);
+      const allCategories = new Set<Category>(CATEGORY_ORDER);
       const allProjectIds = new Set(
         projects.map((p) => p.id),
       );
@@ -237,6 +232,8 @@ export function Timeline({
   const reorderProjects = useCallback(
     (personId: string, fromId: string, toId: string) => {
       if (fromId === toId) return;
+      // FERIE è fissa in cima: non partecipa al riordino.
+      if (isFerieProject(fromId) || isFerieProject(toId)) return;
       const segs = optimisticSegments.filter((s) => s.personId === personId);
       const ids = [...new Set(segs.map((s) => s.projectId))];
       const current = sortProjectIds(

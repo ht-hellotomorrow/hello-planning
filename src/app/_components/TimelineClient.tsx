@@ -26,7 +26,7 @@ export function TimelineClient(props: TimelineDataProps) {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({
-      left: WEEKS_BEFORE_TODAY * WEEK_WIDTH,
+      left: Math.max(0, WEEKS_BEFORE_TODAY - 1) * WEEK_WIDTH,
       behavior: "smooth",
     });
   }, []);
