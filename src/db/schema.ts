@@ -94,6 +94,13 @@ export const allocationSegments = sqliteTable(
   ],
 );
 
+// Rate limiting del login: un contatore a finestra fissa per IP.
+export const loginAttempts = sqliteTable("login_attempts", {
+  ip: text("ip").primaryKey(),
+  count: integer("count").notNull().default(0),
+  windowStart: integer("window_start").notNull(),
+});
+
 export type Person = typeof people.$inferSelect;
 export type NewPerson = typeof people.$inferInsert;
 export type Project = typeof projects.$inferSelect;

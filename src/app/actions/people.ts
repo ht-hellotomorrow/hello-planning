@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { people } from "@/db/schema";
+import { requireAuth } from "@/lib/require-auth";
 
 function validateCapacity(raw: string | null | undefined): number {
   const c = raw ? Number.parseFloat(raw) : 5;
@@ -14,6 +15,7 @@ function validateCapacity(raw: string | null | undefined): number {
 }
 
 export async function addPerson(formData: FormData) {
+  await requireAuth();
   const firstName = (formData.get("firstName") as string | null)?.trim();
   const lastName = (formData.get("lastName") as string | null)?.trim() ?? "";
   const capacityRaw = formData.get("capacity") as string | null;
@@ -41,6 +43,7 @@ export async function addPerson(formData: FormData) {
 }
 
 export async function updatePerson(formData: FormData) {
+  await requireAuth();
   const id = formData.get("id") as string | null;
   if (!id) throw new Error("Id required");
 
@@ -68,18 +71,21 @@ export async function updatePerson(formData: FormData) {
 }
 
 export async function archivePerson(id: string) {
+  await requireAuth();
   await db.update(people).set({ archived: true }).where(eq(people.id, id));
   revalidatePath("/");
   revalidatePath("/people");
 }
 
 export async function unarchivePerson(id: string) {
+  await requireAuth();
   await db.update(people).set({ archived: false }).where(eq(people.id, id));
   revalidatePath("/");
   revalidatePath("/people");
 }
 
 export async function reorderPeople(orderedIds: string[]) {
+  await requireAuth();
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) return;
   // One UPDATE per id. Small list (<50), parallelizable.
   await Promise.all(
@@ -92,6 +98,7 @@ export async function reorderPeople(orderedIds: string[]) {
 }
 
 export async function deletePerson(id: string) {
+  await requireAuth();
   // ON DELETE CASCADE on allocation_segments foreign keys
   // automatically removes all the person's schedules.
   await db.delete(people).where(eq(people.id, id));

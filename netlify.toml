@@ -5,3 +5,13 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# Security headers su tutte le risposte (incluse le statiche).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

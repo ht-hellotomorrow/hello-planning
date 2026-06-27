@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { allocationSegments } from "@/db/schema";
+import { requireAuth } from "@/lib/require-auth";
 
 export type CreateSegmentInput = {
   personId: string;
@@ -27,6 +28,7 @@ function validateRange(start: string, end: string) {
 export async function createSegment(
   input: CreateSegmentInput,
 ): Promise<{ id: string }> {
+  await requireAuth();
   if (!input.personId) throw new Error("Person required");
   if (!input.projectId) throw new Error("Project required");
   validateRange(input.startWeek, input.endWeek);
@@ -53,6 +55,7 @@ export type UpdateSegmentInput = {
 };
 
 export async function updateSegment(id: string, patch: UpdateSegmentInput) {
+  await requireAuth();
   if (!id) throw new Error("Id required");
 
   const update: Record<string, unknown> = {
@@ -79,12 +82,14 @@ export async function updateSegment(id: string, patch: UpdateSegmentInput) {
 }
 
 export async function deleteSegment(id: string) {
+  await requireAuth();
   if (!id) throw new Error("Id required");
   await db.delete(allocationSegments).where(eq(allocationSegments.id, id));
   revalidatePath("/");
 }
 
 export async function deleteSegmentsByIds(ids: string[]) {
+  await requireAuth();
   if (!ids.length) return;
   await db
     .delete(allocationSegments)
@@ -104,6 +109,7 @@ export type SplitSegmentInput = {
 export async function splitSegment(
   input: SplitSegmentInput,
 ): Promise<{ newId: string }> {
+  await requireAuth();
   if (!input.id) throw new Error("Id required");
   if (!input.splitAtWeek) throw new Error("Split week required");
 

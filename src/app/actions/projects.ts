@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { projects } from "@/db/schema";
 import { isFerieProject } from "@/lib/ferie";
+import { requireAuth } from "@/lib/require-auth";
 
 export type CreatePersonalProjectInput = {
   name: string;
@@ -14,6 +15,7 @@ export type CreatePersonalProjectInput = {
 export async function createPersonalProject(
   input: CreatePersonalProjectInput,
 ): Promise<{ id: string }> {
+  await requireAuth();
   const name = input.name?.trim();
   if (!name) throw new Error("Name required");
   const code = input.code?.trim() || null;
@@ -34,6 +36,7 @@ export async function createPersonalProject(
 }
 
 export async function deletePersonalProject(id: string) {
+  await requireAuth();
   if (!id) throw new Error("Id required");
   if (isFerieProject(id)) {
     throw new Error("Il progetto FERIE non può essere eliminato");
